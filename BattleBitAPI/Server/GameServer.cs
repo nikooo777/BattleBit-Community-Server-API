@@ -79,7 +79,7 @@ namespace BattleBitAPI.Server
                 //Send new settings
                 using (var pck = Common.Serialization.Stream.Get())
                 {
-                    pck.Write((byte)NetworkCommuncation.SetNewRoomSettings);
+                    pck.Write((byte)NetworkCommunication.SetNewRoomSettings);
                     this.mInternal._RoomSettings.Write(pck);
                     WriteToSocket(pck);
                 }
@@ -121,7 +121,7 @@ namespace BattleBitAPI.Server
                 //Send new round settings
                 using (var pck = Common.Serialization.Stream.Get())
                 {
-                    pck.Write((byte)NetworkCommuncation.SetNewRoundState);
+                    pck.Write((byte)NetworkCommunication.SetNewRoundState);
                     this.mInternal._RoundSettings.Write(pck);
                     WriteToSocket(pck);
                 }
@@ -521,7 +521,7 @@ namespace BattleBitAPI.Server
             lock (this.mInternal.mWriteStream)
             {
                 this.mInternal.mWriteStream.Write((uint)(1 + 2 + bytesLong));
-                this.mInternal.mWriteStream.Write((byte)NetworkCommuncation.ExecuteCommand);
+                this.mInternal.mWriteStream.Write((byte)NetworkCommunication.ExecuteCommand);
                 this.mInternal.mWriteStream.Write(cmd);
             }
         }
@@ -694,7 +694,7 @@ namespace BattleBitAPI.Server
             //Respond back.
             using (var response = Common.Serialization.Stream.Get())
             {
-                response.Write((byte)NetworkCommuncation.SpawnPlayer);
+                response.Write((byte)NetworkCommunication.SpawnPlayer);
                 response.Write(steamID);
                 request.Write(response);
                 response.Write((ushort)0);
@@ -739,7 +739,7 @@ namespace BattleBitAPI.Server
         {
             using (var packet = Common.Serialization.Stream.Get())
             {
-                packet.Write((byte)NetworkCommuncation.SetPlayerWeapon);
+                packet.Write((byte)NetworkCommunication.SetPlayerWeapon);
                 packet.Write(steamID);
                 packet.Write((byte)0);//Primary
                 item.Write(packet);
@@ -757,7 +757,7 @@ namespace BattleBitAPI.Server
         {
             using (var packet = Common.Serialization.Stream.Get())
             {
-                packet.Write((byte)NetworkCommuncation.SetPlayerWeapon);
+                packet.Write((byte)NetworkCommunication.SetPlayerWeapon);
                 packet.Write(steamID);
                 packet.Write((byte)1);//Secondary
                 item.Write(packet);
@@ -775,7 +775,7 @@ namespace BattleBitAPI.Server
         {
             using (var packet = Common.Serialization.Stream.Get())
             {
-                packet.Write((byte)NetworkCommuncation.SetPlayerGadget);
+                packet.Write((byte)NetworkCommunication.SetPlayerGadget);
                 packet.Write(steamID);
                 packet.Write((byte)2);//first aid
                 packet.Write(tool);
@@ -793,7 +793,7 @@ namespace BattleBitAPI.Server
         {
             using (var packet = Common.Serialization.Stream.Get())
             {
-                packet.Write((byte)NetworkCommuncation.SetPlayerGadget);
+                packet.Write((byte)NetworkCommunication.SetPlayerGadget);
                 packet.Write(steamID);
                 packet.Write((byte)3);//Tool A
                 packet.Write(tool);
@@ -811,7 +811,7 @@ namespace BattleBitAPI.Server
         {
             using (var packet = Common.Serialization.Stream.Get())
             {
-                packet.Write((byte)NetworkCommuncation.SetPlayerGadget);
+                packet.Write((byte)NetworkCommunication.SetPlayerGadget);
                 packet.Write(steamID);
                 packet.Write((byte)4);//Tool A
                 packet.Write(tool);
@@ -829,7 +829,7 @@ namespace BattleBitAPI.Server
         {
             using (var packet = Common.Serialization.Stream.Get())
             {
-                packet.Write((byte)NetworkCommuncation.SetPlayerGadget);
+                packet.Write((byte)NetworkCommunication.SetPlayerGadget);
                 packet.Write(steamID);
                 packet.Write((byte)5);//Tool A
                 packet.Write(tool);
