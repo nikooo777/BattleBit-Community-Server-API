@@ -18,7 +18,7 @@ Current features are:
 - `!ban <target> <length in minutes> <optional reason>` bans a player from the server.
 
 An additional feature is that all chat messages are logged to a file named `chat_date-here.log` in the same directory as the binary.
-Additionally all chat messages are logged to a mysql database if configured.
+Additionally all chat messages are logged to a mysql database ~~if configured~~.
 
 ### Targeting
 
@@ -38,6 +38,7 @@ The following target rules apply:
 ### Examples
 
 - `!ban nik 60 best reason ever`
+- `!ban niko 0` (permanent ban with default reason)
 - `!kick @usa`
 - `!slay @alive`
 - `!kick #76561197997290818 your name is impossible to type`
@@ -74,7 +75,8 @@ ___
 
 Documentation and examples can be found on the [wiki](https://github.com/MrOkiDoki/BattleBit-Community-Server-API/wiki) (WIP).
 
-The way to use this API is to make an instance of `ServerListener` (and start it) on which you pass the types of your *own* subclasses of `Player` & `GameServer`. In those subclasses, you can make your own overrides to the already existing methods in `Player` and `GameServer`. You can also add your own methods and fields/properties.
+The way to use this API is to make an instance of `ServerListener` (and start it) on which you pass the types of your
+*own* subclasses of `Player` & `GameServer`. In those subclasses, you can make your own overrides to the already existing methods in `Player` and `GameServer`. You can also add your own methods and fields/properties.
 
 The easiest way to get started with all of this, is to use `Program.cs` and add your overrides etc. into `MyPlayer` & `MyGameServer`.
 
