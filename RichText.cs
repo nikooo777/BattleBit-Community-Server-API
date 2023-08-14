@@ -2,10 +2,14 @@ namespace CommunityServerAPI;
 
 public static class RichText
 {
+    public const string LineBreak = "<br>";
+
+    public const string EndColor = "</color>";
     // https://docs.unity3d.com/Packages/com.unity.ugui@1.0/manual/StyledText.html#supported-colors
     // http://digitalnativestudios.com/textmeshpro/docs/rich-text/
 
     #region Colors
+
     public const string Aqua = "<color=#00ffff>";
     public const string Black = "<color=#000000>";
     public const string Blue = "<color=#0000ff>";
@@ -28,9 +32,11 @@ public static class RichText
     public const string Teal = "<color=#008080>";
     public const string White = "<color=#ffffff>";
     public const string Yellow = "<color=#ffff00>";
+
     #endregion
 
     #region Sprites
+
     //icons
     public const string Moderator = "<sprite index=0>";
     public const string Patreon = "<sprite index=1>";
@@ -48,7 +54,7 @@ public static class RichText
     public const string Misc4 = "<sprite index=13>";
     public const string Misc5 = "<sprite index=14>";
     public const string Misc6 = "<sprite index=15>";
-    
+
     //emojis
     public const string Blush = "<sprite=\"EmojiOne\" index=0>";
     public const string Yum = "<sprite=\"EmojiOne\" index=1>";
@@ -66,12 +72,11 @@ public static class RichText
     public const string Rofl = "<sprite=\"EmojiOne\" index=13>";
     public const string SlightSmile = "<sprite=\"EmojiOne\" index=14>";
     public const string SlightFrown = "<sprite=\"EmojiOne\" index=15>";
+
     #endregion
 
-    public const string LineBreak = "<br>";
-    public const string EndColor = "</color>";
-
     #region Text Formatting
+
     public static string Bold(string text)
     {
         return $"<b>{text}</b>";
@@ -96,64 +101,66 @@ public static class RichText
     {
         return $"<sup>{text}</sup>";
     }
-    
+
     public static string SubScript(string text)
     {
         return $"<sub>{text}</sub>";
     }
+
     #endregion
 
     #region Styles
+
     public static string StyleH1(string text)
     {
         return $"<style=\"H1\">{text}</style>";
     }
-    
+
     public static string StyleH2(string text)
     {
         return $"<style=\"H2\">{text}</style>";
     }
-    
+
     public static string StyleH3(string text)
     {
         return $"<style=\"H3\">{text}</style>";
     }
-    
+
     public static string StyleC1(string text)
     {
         return $"<style=\"C1\">{text}</style>";
     }
-    
+
     public static string StyleC2(string text)
     {
         return $"<style=\"C2\">{text}</style>";
     }
-    
+
     public static string StyleC3(string text)
     {
         return $"<style=\"C3\">{text}</style>";
     }
-    
+
     public static string StyleNormal(string text)
     {
         return $"<style=\"Normal\">{text}</style>";
     }
-    
+
     public static string StyleTitle(string text)
     {
         return $"<style=\"Title\">{text}</style>";
     }
-    
+
     public static string StyleQuote(string text)
     {
         return $"<style=\"Quote\">{text}</style>";
     }
-    
+
     public static string StyleLink(string text)
     {
         return $"<style=\"Link\">{text}</style>";
     }
-    
+
     public static string Highlight(string text, string color)
     {
         return $"<mark={color}>{text}</mark>";
@@ -163,9 +170,11 @@ public static class RichText
     {
         return $"<voffset={amount}em>{text}</voffset>";
     }
+
     public static string Size(string text, int sizeValue)
     {
         return $"<size={sizeValue}>{text}</size>";
     }
-    #endregion    
+
+    #endregion
 }
