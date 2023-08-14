@@ -6,6 +6,62 @@ Language English | [中文](/README-zhCN.md) | [한국어](/README-koKR.md)
 
 This repository provides an API that can be used to handle events on your community server(s) and manipulate them.
 
+## Fork Description
+
+This is a fork that adds admin utilities for BattleBit administrators and moderators.
+Current features are:
+
+- `!say` sends a message to all players formatted with colors and distinguishable from normal chat. (short form is `@message here`)
+- `!clear` clears the chat for all players.
+- `!kick <target> <optional reason>` kicks a player from the server.
+- `!slay <target>` kills a player.
+- `!ban <target> <length in minutes> <optional reason>` bans a player from the server.
+
+An additional feature is that all chat messages are logged to a file named `chat_date-here.log` in the same directory as the binary.
+Additionally all chat messages are logged to a mysql database if configured.
+
+### Targeting
+
+The following target rules apply:
+
+- `@all` targets all players.
+- `@me` targets the player who sent the command.
+- `@!me` targets all players except the player who sent the command.
+- `@usa` targets all players on the USA team.
+- `@rus` targets all players on the RUS team.
+- `@dead` targets all players who are dead.
+- `@alive` targets all players who are alive.
+- `@class-here` targets all players of the specified class. (assault, medic, support, engineer, recon, leader)
+- `#steam_id64-here` targets the player with the specified SteamID64. (e.g. `#76561197997290818`) (max 1 match)
+- `name-here` targets the player with the specified name. (e.g. `nik`) would match Nik, Niko, Nikolas, etc. (max 1 match)
+
+### Examples
+
+- `!ban nik 60 best reason ever`
+- `!kick @usa`
+- `!slay @alive`
+- `!kick #76561197997290818 your name is impossible to type`
+
+## Database setup
+
+you need a mysql database running locally (values are currently hardcoded). The following will get you running.
+
+```mysql
+create database battlebit;
+use battlebit;
+CREATE TABLE ChatLogs (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    Message TEXT NOT NULL,
+    PlayerId VARCHAR(255) NOT NULL,
+    Timestamp DATETIME NOT NULL
+);
+CREATE USER 'battlebit'@'127.0.0.1' IDENTIFIED BY 'battlebit';
+GRANT ALL PRIVILEGES ON battlebit.* TO 'battlebit'@'127.0.0.1';
+FLUSH PRIVILEGES;
+```
+
+___
+
 ## Getting started
 
 ### Prerequisites
