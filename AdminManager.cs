@@ -73,7 +73,11 @@ public static class ChatProcessor
         try
         {
             var targets = FindTarget(arguments[0], sender, server);
-            targets.ToList().ForEach(t => server.Kick(t, reason));
+            targets.ToList().ForEach(t =>
+            {
+                server.Kick(t, reason);
+                server.UILogOnServer($"{t.Name} was kicked from the server: {reason}", 3f);
+            });
         }
         catch (Exception e)
         {
@@ -89,8 +93,12 @@ public static class ChatProcessor
         try
         {
             var targets = FindTarget(args, sender, server).ToList();
-            Console.WriteLine($"Targets: {targets.Count} all IDs: {(targets.Any() ? targets.Select(t => t.ToString()).Aggregate((a, b) => $"{a}, {b}") : "None")}");
-            targets.ForEach(server.Kill);
+            // Console.WriteLine($"Targets: {targets.Count} all IDs: {(targets.Any() ? targets.Select(t => t.Name.ToString()).Aggregate((a, b) => $"{a}, {b}") : "None")}");
+            targets.ForEach(t =>
+            {
+                server.UILogOnServer($"{t.Name} was slayed", 3f);
+                server.Kill(t);
+            });
         }
         catch (Exception e)
         {
@@ -104,48 +112,48 @@ public static class ChatProcessor
     // FindTarget returns a list of steamIds based on the target string
     // if the target filter is a partial name or steamId then it will only allow returning one player
     // if special filters are used then it may return multiple players
-    private static IEnumerable<ulong> FindTarget(string target, MyPlayer sender, GameServer<MyPlayer> server)
+    private static IEnumerable<MyPlayer> FindTarget(string target, MyPlayer sender, GameServer<MyPlayer> server)
     {
         var players = server.AllPlayers.ToList();
         var nameMatchCount = 0;
         var idMatchCount = 0;
-        var matches = new ulong[players.Count];
+        var matches = new List<MyPlayer>();
         switch (target.ToLower())
         {
             // if string contains @all then return everyone
             case "@all":
-                return players.Select(p => p.SteamID).ToArray();
+                return players.Select(p => p).ToArray();
             // if string contains @!me then return everyone except the sender
             case "@!me":
-                return players.Where(p => p.SteamID != sender.SteamID).Select(p => p.SteamID).ToArray();
+                return players.Where(p => p.SteamID != sender.SteamID).Select(p => p).ToArray();
             // if string contains @me then return the sender
             case "@me":
-                return new[] { sender.SteamID };
+                return new[] { sender };
             // if string contains @usa then return all those on team A
             case "@usa":
-                return players.Where(p => p.Team == Team.TeamA).Select(p => p.SteamID).ToArray();
+                return players.Where(p => p.Team == Team.TeamA).Select(p => p).ToArray();
             // if string contains @rus then return all those on team B
             case "@rus":
-                return players.Where(p => p.Team == Team.TeamB).Select(p => p.SteamID).ToArray();
+                return players.Where(p => p.Team == Team.TeamB).Select(p => p).ToArray();
             // if string contains @dead then return all those currently dead using p.IsAlive
             case "@dead":
-                return players.Where(p => !p.IsAlive).Select(p => p.SteamID).ToArray();
+                return players.Where(p => !p.IsAlive).Select(p => p).ToArray();
             // if string contains @alive then return all those currently alive using p.IsAlive
             case "@alive":
-                return players.Where(p => p.IsAlive).Select(p => p.SteamID).ToArray();
+                return players.Where(p => p.IsAlive).Select(p => p).ToArray();
             // target Assault, Medic , Support, Engineer, Recon, Leader
             case "@assault":
-                return players.Where(p => p.Role == GameRole.Assault).Select(p => p.SteamID).ToArray();
+                return players.Where(p => p.Role == GameRole.Assault).Select(p => p).ToArray();
             case "@medic":
-                return players.Where(p => p.Role == GameRole.Medic).Select(p => p.SteamID).ToArray();
+                return players.Where(p => p.Role == GameRole.Medic).Select(p => p).ToArray();
             case "@support":
-                return players.Where(p => p.Role == GameRole.Support).Select(p => p.SteamID).ToArray();
+                return players.Where(p => p.Role == GameRole.Support).Select(p => p).ToArray();
             case "@engineer":
-                return players.Where(p => p.Role == GameRole.Engineer).Select(p => p.SteamID).ToArray();
+                return players.Where(p => p.Role == GameRole.Engineer).Select(p => p).ToArray();
             case "@recon":
-                return players.Where(p => p.Role == GameRole.Recon).Select(p => p.SteamID).ToArray();
+                return players.Where(p => p.Role == GameRole.Recon).Select(p => p).ToArray();
             case "@leader":
-                return players.Where(p => p.Role == GameRole.Leader).Select(p => p.SteamID).ToArray();
+                return players.Where(p => p.Role == GameRole.Leader).Select(p => p).ToArray();
         }
 
         //if string starts in # then return the player with a partially matching steamID instead of name
@@ -156,7 +164,7 @@ public static class ChatProcessor
             {
                 if (!p.SteamID.ToString().Contains(steamId)) return;
                 idMatchCount++;
-                matches = matches.Append(p.SteamID).ToArray();
+                matches.Add(p);
             });
         }
 
@@ -169,7 +177,7 @@ public static class ChatProcessor
         foreach (var player in players.Where(player => player.Name.ToLower().Contains(target.ToLower())))
         {
             nameMatchCount++;
-            matches = matches.Append(player.SteamID).ToArray();
+            matches.Add(player);
         }
 
         if (nameMatchCount > 1) throw new Exception("multiple players match that name");
