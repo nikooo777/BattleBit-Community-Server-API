@@ -10,13 +10,30 @@ public static class ChatProcessor
         { "say", SayCmd },
         { "clear", ClearCmd },
         { "kick", KickCmd },
-        { "slay", SlayCmd }
-        // { "ban", Cmd },
-        // { "gag", Cmd },
-        // { "gravity", Cmd },
-        // { "speed", Cmd },
+        { "slay", SlayCmd },
+        { "ban", BanCmd }
+        // { "gag", GagCmd },
+        // { "gravity", GravityCmd },
+        // { "speed", SpeedCmd },
         // { "", Cmd }
     };
+
+    private static readonly Dictionary<ulong, Tuple<long, string>> BannedPlayers = new();
+
+    //IsBanned returns a tuple with the first value being a bool indicating if the player is banned and the second value being the reason for the ban (with the remaining lenght appended).
+    public static Tuple<bool, string> IsBanned(ulong steamId)
+    {
+        if (!BannedPlayers.ContainsKey(steamId)) return new Tuple<bool, string>(false, "");
+        var ban = BannedPlayers[steamId];
+
+        var unixTime = ((DateTimeOffset)DateTime.UtcNow).ToUnixTimeSeconds();
+        var formattedLength = LengthFromMinutes((int)((ban.Item1 - unixTime) / 60.1f));
+
+        if (unixTime <= ban.Item1) return new Tuple<bool, string>(true, ban.Item2 + $" {formattedLength}");
+
+        BannedPlayers.Remove(steamId);
+        return new Tuple<bool, string>(false, "");
+    }
 
     public static bool ProcessChat(string message, MyPlayer sender, GameServer<MyPlayer> server)
     {
@@ -107,6 +124,60 @@ public static class ChatProcessor
         }
 
         return false;
+    }
+
+    private static bool BanCmd(string args, MyPlayer sender, GameServer<MyPlayer> server)
+    {
+        //!ban <target> <length> <reason>
+        var arguments = args.Split(' ', 3);
+        if (arguments.Length < 2)
+        {
+            server.MessageToPlayer(sender, "Invalid number of arguments for ban command (<target> <length> <reason>)");
+            return false;
+        }
+
+        if (!int.TryParse(arguments[1], out var lengthMinutes))
+        {
+            server.MessageToPlayer(sender, "Invalid ban length (pass a number of minutes)");
+            return false;
+        }
+
+        lengthMinutes = int.Parse(arguments[1]);
+        //convert minutes to human readable string (if minutes are hours or days, that is used instead)
+        var lengthMessage = LengthFromMinutes(lengthMinutes);
+        var reason = arguments.Length > 2 ? $"{arguments[2]}" : "Banned by admin";
+
+        try
+        {
+            var targets = FindTarget(arguments[0], sender, server);
+            targets.ToList().ForEach(t =>
+            {
+                var banExpiry = ((DateTimeOffset)DateTime.UtcNow).ToUnixTimeSeconds() + lengthMinutes * 60;
+                if (lengthMinutes <= 0) banExpiry = DateTime.MaxValue.Ticks;
+
+                BannedPlayers.Add(t.SteamID, new Tuple<long, string>(banExpiry, reason));
+                server.Kick(t, reason + $" {lengthMessage}");
+                server.UILogOnServer($"{t.Name} was banned from the server: {reason} ({lengthMessage})", 4f);
+            });
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            throw;
+        }
+
+        return false;
+    }
+
+    private static string LengthFromMinutes(int lengthMinutes)
+    {
+        return lengthMinutes switch
+        {
+            <= 0 => "permanently",
+            < 60 => $"{lengthMinutes} minutes",
+            < 1440 => $"{lengthMinutes / 60f:0.0} hours",
+            _ => $"{lengthMinutes / 1440f:0.0} days"
+        };
     }
 
     // FindTarget returns a list of steamIds based on the target string
