@@ -1,6 +1,6 @@
 ﻿namespace BattleBitAPI.Networking
 {
-    public enum NetworkCommunication : byte
+    public enum NetworkCommuncation : byte
     {
         None = 0,
         Hail = 1,
