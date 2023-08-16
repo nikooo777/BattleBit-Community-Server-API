@@ -1,39 +1,58 @@
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
 
-namespace CommunityServerAPI;
+namespace CommunityServerAPI.AdminTools;
 
 public static class ChatProcessor
 {
+    public enum BlockType
+    {
+        Ban,
+        Gag,
+        Mute
+    }
+
     private static readonly Dictionary<string, Func<string, MyPlayer, GameServer<MyPlayer>, bool>> Commands = new()
     {
         { "say", SayCmd },
         { "clear", ClearCmd },
         { "kick", KickCmd },
         { "slay", SlayCmd },
-        { "ban", BanCmd }
-        // { "gag", GagCmd },
+        { "ban", BanCmd },
+        { "gag", GagCmd }
         // { "gravity", GravityCmd },
         // { "speed", SpeedCmd },
         // { "", Cmd }
     };
 
-    private static readonly Dictionary<ulong, Tuple<long, string>> BannedPlayers = new();
+    private static readonly Dictionary<ulong, (long timestamp, string reason)> BannedPlayers = new();
+    private static readonly Dictionary<ulong, (long timestamp, string reason)> GaggedPlayers = new();
+    private static readonly Dictionary<ulong, (long timestamp, string reason)> MutedPlayers = new();
 
-    //IsBanned returns a tuple with the first value being a bool indicating if the player is banned and the second value being the reason for the ban (with the remaining lenght appended).
-    public static Tuple<bool, string> IsBanned(ulong steamId)
+
+    public static (bool isBlocked, string reason) IsBlocked(ulong steamId, BlockType blockType)
     {
-        if (!BannedPlayers.ContainsKey(steamId)) return new Tuple<bool, string>(false, "");
-        var ban = BannedPlayers[steamId];
+        var blockDict = blockType switch
+        {
+            BlockType.Ban => BannedPlayers,
+            BlockType.Gag => GaggedPlayers,
+            BlockType.Mute => MutedPlayers,
+            _ => throw new ArgumentOutOfRangeException(nameof(blockType), blockType, null)
+        };
+
+        if (!blockDict.TryGetValue(steamId, out var block))
+            return (false, "");
 
         var unixTime = ((DateTimeOffset)DateTime.UtcNow).ToUnixTimeSeconds();
-        var formattedLength = LengthFromMinutes((int)((ban.Item1 - unixTime) / 60.1f));
+        var formattedLength = LengthFromSeconds(block.timestamp - unixTime);
 
-        if (unixTime <= ban.Item1) return new Tuple<bool, string>(true, ban.Item2 + $" {formattedLength}");
+        if (unixTime <= block.timestamp)
+            return (true, $"{block.reason} (length: {formattedLength})");
 
-        BannedPlayers.Remove(steamId);
-        return new Tuple<bool, string>(false, "");
+        blockDict.Remove(steamId);
+        return (false, "");
     }
+
 
     public static bool ProcessChat(string message, MyPlayer sender, GameServer<MyPlayer> server)
     {
@@ -69,6 +88,48 @@ public static class ChatProcessor
             Console.WriteLine($"Error: {ex.Message}");
             return false;
         }
+    }
+
+    private static bool GagCmd(string args, MyPlayer sender, GameServer<MyPlayer> server)
+    {
+        //!gag <target> <length> <optional reason>
+        var arguments = args.Split(' ', 3);
+        if (arguments.Length < 2)
+        {
+            server.MessageToPlayer(sender, "Invalid number of arguments for ban command (<target> <length> <reason>)");
+            return false;
+        }
+
+        if (!int.TryParse(arguments[1], out var lengthMinutes))
+        {
+            server.MessageToPlayer(sender, "Invalid gag length (pass a number of minutes)");
+            return false;
+        }
+
+        lengthMinutes = int.Parse(arguments[1]);
+        //convert minutes to human readable string (if minutes are hours or days, that is used instead)
+        var lengthMessage = LengthFromSeconds(lengthMinutes * 60);
+        var reason = arguments.Length > 2 ? $"{arguments[2]}" : "Gagged by admin";
+
+        try
+        {
+            var targets = FindTarget(arguments[0], sender, server);
+            targets.ToList().ForEach(t =>
+            {
+                var gagExpiry = ((DateTimeOffset)DateTime.UtcNow).ToUnixTimeSeconds() + lengthMinutes * 60;
+                if (lengthMinutes <= 0) gagExpiry = DateTime.MaxValue.Ticks;
+
+                GaggedPlayers.Add(t.SteamID, new ValueTuple<long, string>(gagExpiry, reason));
+                server.UILogOnServer($"{t.Name} was gagged: {reason} ({lengthMessage})", 4f);
+            });
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            throw;
+        }
+
+        return false;
     }
 
     private static bool SayCmd(string message, MyPlayer sender, GameServer<MyPlayer> server)
@@ -128,7 +189,7 @@ public static class ChatProcessor
 
     private static bool BanCmd(string args, MyPlayer sender, GameServer<MyPlayer> server)
     {
-        //!ban <target> <length> <reason>
+        //!ban <target> <length> <optional reason>
         var arguments = args.Split(' ', 3);
         if (arguments.Length < 2)
         {
@@ -144,7 +205,7 @@ public static class ChatProcessor
 
         lengthMinutes = int.Parse(arguments[1]);
         //convert minutes to human readable string (if minutes are hours or days, that is used instead)
-        var lengthMessage = LengthFromMinutes(lengthMinutes);
+        var lengthMessage = LengthFromSeconds(lengthMinutes * 60);
         var reason = arguments.Length > 2 ? $"{arguments[2]}" : "Banned by admin";
 
         try
@@ -155,7 +216,7 @@ public static class ChatProcessor
                 var banExpiry = ((DateTimeOffset)DateTime.UtcNow).ToUnixTimeSeconds() + lengthMinutes * 60;
                 if (lengthMinutes <= 0) banExpiry = DateTime.MaxValue.Ticks;
 
-                BannedPlayers.Add(t.SteamID, new Tuple<long, string>(banExpiry, reason));
+                BannedPlayers.Add(t.SteamID, new ValueTuple<long, string>(banExpiry, reason));
                 server.Kick(t, reason + $" {lengthMessage}");
                 server.UILogOnServer($"{t.Name} was banned from the server: {reason} ({lengthMessage})", 4f);
             });
@@ -169,20 +230,22 @@ public static class ChatProcessor
         return false;
     }
 
-    private static string LengthFromMinutes(int lengthMinutes)
+    private static string LengthFromSeconds(long lengthSeconds)
     {
+        var lengthMinutes = lengthSeconds / 60f;
         return lengthMinutes switch
         {
             <= 0 => "permanently",
-            < 60 => $"{lengthMinutes} minutes",
+            < 1 => $"{lengthSeconds:0} seconds",
+            < 60 => $"{lengthMinutes:0.0} minutes",
             < 1440 => $"{lengthMinutes / 60f:0.0} hours",
             _ => $"{lengthMinutes / 1440f:0.0} days"
         };
     }
 
-    // FindTarget returns a list of steamIds based on the target string
-    // if the target filter is a partial name or steamId then it will only allow returning one player
-    // if special filters are used then it may return multiple players
+    /// FindTarget returns a list of steamIds based on the target string
+    /// if the target filter is a partial name or steamId then it will only allow returning one player
+    /// if special filters are used then it may return multiple players
     private static IEnumerable<MyPlayer> FindTarget(string target, MyPlayer sender, GameServer<MyPlayer> server)
     {
         var players = server.AllPlayers.ToList();

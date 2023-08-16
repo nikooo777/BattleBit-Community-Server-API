@@ -7,7 +7,7 @@ public class PlayerStats
     public byte[] Achievements;
 
     public bool IsBanned;
-    public PlayerProgess Progress = new();
+    public PlayerProgress Progress = new();
     public Roles Roles;
     public byte[] Selections;
     public byte[] ToolProgress;
@@ -97,13 +97,14 @@ public class PlayerStats
         Read(ser);
     }
 
-    public class PlayerProgess
+    public class PlayerProgress
     {
         private const uint ParamCount = 42;
         public uint AssaultKills;
         public uint AssaultPlayTime;
         public uint AssaultScore;
         public uint Assists;
+        public uint CompletedObjectives;
         public uint DeathCount;
         public uint EngineerKills;
         public uint EngineerPlayTime;
@@ -123,7 +124,6 @@ public class PlayerStats
         public uint MedicKills;
         public uint MedicPlayTime;
         public uint MedicScore;
-        public uint ObjectivesComplated;
         public uint PlayTimeSeconds;
         public uint Prestige;
         public uint Rank;
@@ -169,7 +169,7 @@ public class PlayerStats
                 ser.Write(ShotsFired);
                 ser.Write(ShotsHit);
                 ser.Write(Headshots);
-                ser.Write(ObjectivesComplated);
+                ser.Write(CompletedObjectives);
                 ser.Write(HealedHPs);
                 ser.Write(RoadKills);
                 ser.Write(Suicides);
@@ -248,7 +248,7 @@ public class PlayerStats
                 if (canRead())
                     Headshots = ser.ReadUInt32();
                 if (canRead())
-                    ObjectivesComplated = ser.ReadUInt32();
+                    CompletedObjectives = ser.ReadUInt32();
                 if (canRead())
                     HealedHPs = ser.ReadUInt32();
                 if (canRead())
@@ -316,7 +316,7 @@ public class PlayerStats
             ShotsFired = 0;
             ShotsHit = 0;
             Headshots = 0;
-            ObjectivesComplated = 0;
+            CompletedObjectives = 0;
             HealedHPs = 0;
             RoadKills = 0;
             Suicides = 0;
