@@ -7,7 +7,7 @@ namespace CommunityServerAPI.Storage;
 public class SwissAdminToolsMysql : SwissAdminToolsStore
 {
     private const int MaxMessages = 50;
-    private const int TimerInterval = 30000; // 30 seconds
+    private const int TimerInterval = 10000; // 10 seconds
     private static readonly ConcurrentQueue<(string Message, int PlayerId)> MessageQueue = new();
     private static Timer _timer;
     private readonly MySqlConnection mConnection;
@@ -101,16 +101,34 @@ public class SwissAdminToolsMysql : SwissAdminToolsStore
     public void StorePlayer(ulong steamId, PlayerJoiningArguments args)
     {
         var command = new MySqlCommand(
-            "INSERT INTO player (steam_id, is_banned, roles, achievements, selections, tool_progress) VALUES (@steamId, @isBanned, @roles, @achievements, @selections, @toolProgress)",
+            "INSERT INTO player (steam_id, is_banned, roles, achievements, selections, tool_progress, created_at, updated_at) " +
+            "VALUES (@steamId, @isBanned, @roles, @achievements, @selections, @toolProgress, NOW(), NOW()) " +
+            "ON DUPLICATE KEY UPDATE " +
+            "is_banned = @isBannedUpdate, " +
+            "roles = @rolesUpdate, " +
+            "achievements = @achievementsUpdate, " +
+            "selections = @selectionsUpdate, " +
+            "tool_progress = @toolProgressUpdate, " +
+            "updated_at = NOW()",
             mConnection);
+
         command.Parameters.AddWithValue("@steamId", steamId);
         command.Parameters.AddWithValue("@isBanned", args.Stats.IsBanned);
         command.Parameters.AddWithValue("@roles", args.Stats.Roles);
         command.Parameters.AddWithValue("@achievements", args.Stats.Achievements);
         command.Parameters.AddWithValue("@selections", args.Stats.Selections);
         command.Parameters.AddWithValue("@toolProgress", args.Stats.ToolProgress);
+
+        // Duplicate parameters for the UPDATE section
+        command.Parameters.AddWithValue("@isBannedUpdate", args.Stats.IsBanned);
+        command.Parameters.AddWithValue("@rolesUpdate", args.Stats.Roles);
+        command.Parameters.AddWithValue("@achievementsUpdate", args.Stats.Achievements);
+        command.Parameters.AddWithValue("@selectionsUpdate", args.Stats.Selections);
+        command.Parameters.AddWithValue("@toolProgressUpdate", args.Stats.ToolProgress);
+
         command.ExecuteNonQuery();
     }
+
 
     public int? GetPlayer(ulong steamId)
     {

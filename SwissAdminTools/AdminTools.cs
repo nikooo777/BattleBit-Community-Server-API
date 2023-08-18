@@ -171,7 +171,6 @@ public static class ChatProcessor
         try
         {
             var targets = FindTarget(args, sender, server).ToList();
-            // Console.WriteLine($"Targets: {targets.Count} all IDs: {(targets.Any() ? targets.Select(t => t.Name.ToString()).Aggregate((a, b) => $"{a}, {b}") : "None")}");
             targets.ForEach(t =>
             {
                 server.UILogOnServer($"{t.Name} was slayed", 3f);

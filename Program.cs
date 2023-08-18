@@ -78,6 +78,7 @@ internal class MyGameServer : GameServer<MyPlayer>
 
     public override Task<bool> OnPlayerTypedMessage(MyPlayer player, ChatChannel channel, string msg)
     {
+        Program.Sat.StoreChatLog(player.SteamID, msg);
         var res = ChatProcessor.ProcessChat(msg, player, this);
         if (!res) return Task.FromResult(false);
 
