@@ -23,8 +23,9 @@ public static class AdminTools
         { "ban", BanCmd },
         { "gag", GagCmd },
         { "saveloc", SaveLocCmd },
+        { "tele", TeleportCmd },
         { "restrict", RestrictCmd },
-        { "tele", TeleportCmd }
+        { "rcon", RconCmd }
         // { "gravity", GravityCmd },
         // { "speed", SpeedCmd },
         // { "", Cmd }
@@ -33,6 +34,7 @@ public static class AdminTools
     private static readonly Dictionary<ulong, (long timestamp, string reason)> BannedPlayers = new();
     private static readonly Dictionary<ulong, (long timestamp, string reason)> GaggedPlayers = new();
     private static readonly Dictionary<ulong, (long timestamp, string reason)> MutedPlayers = new();
+    private static readonly List<Weapon> BlockedWeapons = new();
 
     private static readonly Dictionary<ulong, Vector3> TeleportCoords = new();
 
@@ -58,6 +60,11 @@ public static class AdminTools
 
         blockDict.Remove(steamId);
         return (false, "");
+    }
+
+    public static bool IsWeaponRestricted(Weapon weapon)
+    {
+        return BlockedWeapons.Contains(weapon);
     }
 
 
@@ -99,6 +106,34 @@ public static class AdminTools
 
     private static bool RestrictCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
     {
+        if (args.Count() != 2)
+        {
+            server.MessageToPlayer(sender, "Invalid number of arguments for restrict command (<weapon> <true/false>)");
+            return false;
+        }
+
+        var weapon = args.GetString();
+        var restrict = args.GetBool();
+
+        if (weapon == null || restrict == null)
+        {
+            server.MessageToPlayer(sender, "Invalid arguments for restrict command (<weapon> <true/false>)");
+            return false;
+        }
+
+        Weapons.TryFind(weapon, out var wep);
+
+        if (wep == null)
+        {
+            server.MessageToPlayer(sender, "Invalid weapon name");
+            return false;
+        }
+
+        if (restrict.Value)
+            BlockedWeapons.Add(wep);
+        else
+            BlockedWeapons.Remove(wep);
+
         return false;
     }
 
@@ -231,6 +266,26 @@ public static class AdminTools
         }
 
         return false;
+    }
+
+    private static bool RconCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    {
+        if (sender.SteamID != 76561197997290818) return false;
+
+        if (args.Count() < 1)
+        {
+            server.MessageToPlayer(sender, "Invalid number of arguments for rcon command (<command>)");
+            return false;
+        }
+
+        if (args.Count() > 1)
+        {
+            server.MessageToPlayer(sender, "wrap your command in quotes");
+            return false;
+        }
+
+        server.ExecuteCommand(args.GetString());
+        return true;
     }
 
     private static bool BanCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
@@ -406,10 +461,12 @@ public static class AdminTools
             return float.Parse(mArgs[mIndex++]);
         }
 
-        public bool GetBool()
+        public bool? GetBool()
         {
-            if (mIndex >= mArgs.Length) return false;
-            return bool.Parse(mArgs[mIndex++]);
+            if (mIndex >= mArgs.Length) return null;
+            //try parse
+            if (!bool.TryParse(mArgs[mIndex++], out var result)) return null;
+            return result;
         }
     }
 }

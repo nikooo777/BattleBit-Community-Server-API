@@ -90,4 +90,35 @@ internal class MyGameServer : GameServer<MyPlayer>
         player.WarnPlayer($"You are currently gagged: {blockResult.reason}");
         return Task.FromResult(false);
     }
+
+    public override async Task<OnPlayerSpawnArguments> OnPlayerSpawning(MyPlayer player, OnPlayerSpawnArguments request)
+    {
+        if (AdminTools.IsWeaponRestricted(request.Loadout.PrimaryWeapon.Tool))
+        {
+            player.Modifications.CanDeploy = false;
+            player.WarnPlayer($"You are not allowed to use {request.Loadout.PrimaryWeapon.Tool.Name}!");
+        }
+
+        if (AdminTools.IsWeaponRestricted(request.Loadout.SecondaryWeapon.Tool))
+        {
+            player.Modifications.CanDeploy = false;
+            player.WarnPlayer($"You are not allowed to use {request.Loadout.SecondaryWeapon.Tool.Name}!");
+        }
+
+        //create a timer to reset the player's ability to deploy
+        if (player.Modifications.CanDeploy)
+            return request;
+
+        //set the player's ability to deploy to true
+        Timer t = null; // Declare the timer outside the callback for clarity
+
+        t = new Timer(state =>
+        {
+            player.Modifications.CanDeploy = true;
+            player.Kill();
+            t?.Dispose();
+        }, null, 2000, Timeout.Infinite);
+
+        return request;
+    }
 }
