@@ -16,8 +16,14 @@ Current features are:
 - `!kick <target> <optional reason>` kicks a player from the server.
 - `!slay <target>` kills a player.
 - `!ban <target> <length in minutes> <optional reason>` bans a player from the server.
+- `!gag <target> <length in minutes> <optional reason>` gags a player from the server.
+- `!saveloc` saves the current location of the player.
+- `!tele <target>` teleports the player to the saved location.
+- `!restrict <weapon>` restricts a weapon from being used by the player.
+- `!rcon <command>` executes a rcon command on the server. (must be wrapped in quotes if it contains spaces)
 
-An additional feature is that all chat messages are logged to a file named `chat_date-here.log` in the same directory as the binary.
+An additional feature is that all chat messages are logged to a file named `chat_date-here.log` in the same directory as
+the binary.
 Additionally all chat messages are logged to a mysql database ~~if configured~~.
 
 ### Targeting
@@ -33,7 +39,8 @@ The following target rules apply:
 - `@alive` targets all players who are alive.
 - `@class-here` targets all players of the specified class. (assault, medic, support, engineer, recon, leader)
 - `#steam_id64-here` targets the player with the specified SteamID64. (e.g. `#76561197997290818`) (max 1 match)
-- `name-here` targets the player with the specified name. (e.g. `nik`) would match Nik, Niko, Nikolas, etc. (max 1 match)
+- `name-here` targets the player with the specified name. (e.g. `nik`) would match Nik, Niko, Nikolas, etc. (max 1
+  match)
 
 ### Examples
 
@@ -73,16 +80,21 @@ ___
 
 ### Writing
 
-Documentation and examples can be found on the [wiki](https://github.com/MrOkiDoki/BattleBit-Community-Server-API/wiki) (WIP).
+Documentation and examples can be found on
+the [wiki](https://github.com/MrOkiDoki/BattleBit-Community-Server-API/wiki) (WIP).
 
 The way to use this API is to make an instance of `ServerListener` (and start it) on which you pass the types of your
-*own* subclasses of `Player` & `GameServer`. In those subclasses, you can make your own overrides to the already existing methods in `Player` and `GameServer`. You can also add your own methods and fields/properties.
+*own* subclasses of `Player` & `GameServer`. In those subclasses, you can make your own overrides to the already
+existing methods in `Player` and `GameServer`. You can also add your own methods and fields/properties.
 
-The easiest way to get started with all of this, is to use `Program.cs` and add your overrides etc. into `MyPlayer` & `MyGameServer`.
+The easiest way to get started with all of this, is to use `Program.cs` and add your overrides etc.
+into `MyPlayer` & `MyGameServer`.
 
 ### Building
 
-This project can either be built by using [`dotnet build`](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-build) on the command-line or by using the run / build options inside your preferred IDE.
+This project can either be built by
+using [`dotnet build`](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-build) on the command-line or by using
+the run / build options inside your preferred IDE.
 
 Alternatively, you can use Docker to run it. An easy way to do this it to run `docker compose up`.
 
