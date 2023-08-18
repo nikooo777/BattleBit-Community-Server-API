@@ -46,12 +46,15 @@ internal class MyGameServer : GameServer<MyPlayer>
     public override async Task OnConnected()
     {
         ForceStartGame();
+        RoundSettings.SecondsLeft = 3600;
+        RoundSettings.TeamATickets = 100;
+        RoundSettings.TeamBTickets = 100;
         ServerSettings.PlayerCollision = true;
     }
 
     public override async Task OnPlayerConnected(MyPlayer player)
     {
-        var blockDetails = ChatProcessor.IsBlocked(player.SteamID, ChatProcessor.BlockType.Ban);
+        var blockDetails = AdminTools.IsBlocked(player.SteamID, AdminTools.BlockType.Ban);
         if (blockDetails.isBlocked)
         {
             player.Kick(blockDetails.reason);
@@ -79,10 +82,10 @@ internal class MyGameServer : GameServer<MyPlayer>
     public override Task<bool> OnPlayerTypedMessage(MyPlayer player, ChatChannel channel, string msg)
     {
         Program.Sat.StoreChatLog(player.SteamID, msg);
-        var res = ChatProcessor.ProcessChat(msg, player, this);
+        var res = AdminTools.ProcessChat(msg, player, this);
         if (!res) return Task.FromResult(false);
 
-        var blockResult = ChatProcessor.IsBlocked(player.SteamID, ChatProcessor.BlockType.Gag);
+        var blockResult = AdminTools.IsBlocked(player.SteamID, AdminTools.BlockType.Gag);
         if (!blockResult.isBlocked) return Task.FromResult(true);
         player.WarnPlayer($"You are currently gagged: {blockResult.reason}");
         return Task.FromResult(false);

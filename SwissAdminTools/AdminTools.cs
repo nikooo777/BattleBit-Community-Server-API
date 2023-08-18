@@ -1,9 +1,11 @@
+using System.Numerics;
+using System.Text.RegularExpressions;
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
 
 namespace CommunityServerAPI.AdminTools;
 
-public static class ChatProcessor
+public static class AdminTools
 {
     public enum BlockType
     {
@@ -12,14 +14,17 @@ public static class ChatProcessor
         Mute
     }
 
-    private static readonly Dictionary<string, Func<string, MyPlayer, GameServer<MyPlayer>, bool>> Commands = new()
+    private static readonly Dictionary<string, Func<Arguments, MyPlayer, GameServer<MyPlayer>, bool>> Commands = new()
     {
         { "say", SayCmd },
         { "clear", ClearCmd },
         { "kick", KickCmd },
         { "slay", SlayCmd },
         { "ban", BanCmd },
-        { "gag", GagCmd }
+        { "gag", GagCmd },
+        { "saveloc", SaveLocCmd },
+        { "restrict", RestrictCmd },
+        { "tele", TeleportCmd }
         // { "gravity", GravityCmd },
         // { "speed", SpeedCmd },
         // { "", Cmd }
@@ -28,6 +33,8 @@ public static class ChatProcessor
     private static readonly Dictionary<ulong, (long timestamp, string reason)> BannedPlayers = new();
     private static readonly Dictionary<ulong, (long timestamp, string reason)> GaggedPlayers = new();
     private static readonly Dictionary<ulong, (long timestamp, string reason)> MutedPlayers = new();
+
+    private static readonly Dictionary<ulong, Vector3> TeleportCoords = new();
 
 
     public static (bool isBlocked, string reason) IsBlocked(ulong steamId, BlockType blockType)
@@ -56,7 +63,7 @@ public static class ChatProcessor
 
     public static bool ProcessChat(string message, MyPlayer sender, GameServer<MyPlayer> server)
     {
-        if (message.StartsWith("@")) return SayCmd(message.TrimStart('@'), sender, server);
+        if (message.StartsWith("@")) return SayCmd(new Arguments(message.TrimStart('@')), sender, server);
         if (!message.StartsWith("!")) return true;
 
         message = message.TrimStart('!');
@@ -70,7 +77,7 @@ public static class ChatProcessor
         if (split.Length == 1)
             try
             {
-                return Commands[command]("", sender, server);
+                return Commands[command](new Arguments(""), sender, server);
             }
             catch (Exception ex)
             {
@@ -81,7 +88,7 @@ public static class ChatProcessor
         var args = split[1];
         try
         {
-            return Commands[command](args, sender, server);
+            return Commands[command](new Arguments(args), sender, server);
         }
         catch (Exception ex)
         {
@@ -90,30 +97,65 @@ public static class ChatProcessor
         }
     }
 
-    private static bool GagCmd(string args, MyPlayer sender, GameServer<MyPlayer> server)
+    private static bool RestrictCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    {
+        return false;
+    }
+
+    private static bool SaveLocCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    {
+        var loc = sender.Position;
+        TeleportCoords[sender.SteamID] = loc;
+        return false;
+    }
+
+    private static bool TeleportCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    {
+        TeleportCoords.TryGetValue(sender.SteamID, out var loc);
+        try
+        {
+            var targets = FindTarget(args.GetString(), sender, server).ToList();
+            targets.ForEach(t =>
+            {
+                server.UILogOnServer($"{t.Name} was teleported", 3f);
+                t.Teleport(loc);
+            });
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            throw;
+        }
+
+        return false;
+    }
+
+    private static bool GagCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
     {
         //!gag <target> <length> <optional reason>
-        var arguments = args.Split(' ', 3);
-        if (arguments.Length < 2)
+        if (args.Count() < 2)
         {
-            server.MessageToPlayer(sender, "Invalid number of arguments for ban command (<target> <length> <reason>)");
+            server.MessageToPlayer(sender, "Invalid number of arguments for gag command (<target> <length> <reason>)");
             return false;
         }
 
-        if (!int.TryParse(arguments[1], out var lengthMinutes))
+        var targets = FindTarget(args.GetString(), sender, server);
+
+        var mins = args.GetInt();
+        if (mins == null)
         {
             server.MessageToPlayer(sender, "Invalid gag length (pass a number of minutes)");
             return false;
         }
 
-        lengthMinutes = int.Parse(arguments[1]);
+        var lengthMinutes = mins.Value;
+
         //convert minutes to human readable string (if minutes are hours or days, that is used instead)
         var lengthMessage = LengthFromSeconds(lengthMinutes * 60);
-        var reason = arguments.Length > 2 ? $"{arguments[2]}" : "Gagged by admin";
+        var reason = args.Count() > 2 ? args.GetString() : "Gagged by admin";
 
         try
         {
-            var targets = FindTarget(arguments[0], sender, server);
             targets.ToList().ForEach(t =>
             {
                 var gagExpiry = ((DateTimeOffset)DateTime.UtcNow).ToUnixTimeSeconds() + lengthMinutes * 60;
@@ -132,25 +174,30 @@ public static class ChatProcessor
         return false;
     }
 
-    private static bool SayCmd(string message, MyPlayer sender, GameServer<MyPlayer> server)
+    private static bool SayCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
     {
-        server.SayToChat($"{RichText.Red}[{RichText.Bold("ADMIN")}]: {RichText.Magenta}{RichText.Italic(message)}");
+        server.SayToChat($"{RichText.Red}[{RichText.Bold("ADMIN")}]: {RichText.Magenta}{RichText.Italic(args.GetString())}");
         return false;
     }
 
-    private static bool ClearCmd(string message, MyPlayer sender, GameServer<MyPlayer> server)
+    private static bool ClearCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
     {
         server.SayToChat($"\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n{RichText.Size(".", 0)}");
         return false;
     }
 
-    private static bool KickCmd(string args, MyPlayer sender, GameServer<MyPlayer> server)
+    private static bool KickCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
     {
-        var arguments = args.Split(' ', 2);
-        var reason = arguments.Length > 1 ? arguments[1] : "Kicked by admin";
+        if (args.Count() < 1)
+        {
+            server.MessageToPlayer(sender, "Invalid number of arguments for kick command (<target> <reason>)");
+            return false;
+        }
+
+        var targets = FindTarget(args.GetString(), sender, server);
+        var reason = args.Count() > 1 ? args.GetString() : "Kicked by admin";
         try
         {
-            var targets = FindTarget(arguments[0], sender, server);
             targets.ToList().ForEach(t =>
             {
                 server.Kick(t, reason);
@@ -166,11 +213,11 @@ public static class ChatProcessor
         return false;
     }
 
-    private static bool SlayCmd(string args, MyPlayer sender, GameServer<MyPlayer> server)
+    private static bool SlayCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
     {
         try
         {
-            var targets = FindTarget(args, sender, server).ToList();
+            var targets = FindTarget(args.GetString(), sender, server).ToList();
             targets.ForEach(t =>
             {
                 server.UILogOnServer($"{t.Name} was slayed", 3f);
@@ -186,30 +233,32 @@ public static class ChatProcessor
         return false;
     }
 
-    private static bool BanCmd(string args, MyPlayer sender, GameServer<MyPlayer> server)
+    private static bool BanCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
     {
         //!ban <target> <length> <optional reason>
-        var arguments = args.Split(' ', 3);
-        if (arguments.Length < 2)
+        if (args.Count() < 2)
         {
             server.MessageToPlayer(sender, "Invalid number of arguments for ban command (<target> <length> <reason>)");
             return false;
         }
 
-        if (!int.TryParse(arguments[1], out var lengthMinutes))
+        var targets = FindTarget(args.GetString(), sender, server);
+        var mins = args.GetInt();
+        if (mins == null)
         {
             server.MessageToPlayer(sender, "Invalid ban length (pass a number of minutes)");
             return false;
         }
 
-        lengthMinutes = int.Parse(arguments[1]);
+        var lengthMinutes = mins.Value;
+
+        var reason = args.Count() > 2 ? args.GetString() : "Banned by admin";
+
         //convert minutes to human readable string (if minutes are hours or days, that is used instead)
         var lengthMessage = LengthFromSeconds(lengthMinutes * 60);
-        var reason = arguments.Length > 2 ? $"{arguments[2]}" : "Banned by admin";
 
         try
         {
-            var targets = FindTarget(arguments[0], sender, server);
             targets.ToList().ForEach(t =>
             {
                 var banExpiry = ((DateTimeOffset)DateTime.UtcNow).ToUnixTimeSeconds() + lengthMinutes * 60;
@@ -315,5 +364,52 @@ public static class ChatProcessor
 
         if (nameMatchCount > 1) throw new Exception("multiple players match that name");
         return matches;
+    }
+
+    private class Arguments
+    {
+        private readonly string[] mArgs;
+        private int mIndex;
+
+        public Arguments(string input)
+        {
+            // Match non-whitespace or a sequence between double quotes
+            // thank you Copilot
+            var matches = Regex.Matches(input, @"[^\s""']+|""([^""]*)""|'([^']*)'");
+
+            mArgs = new string[matches.Count];
+            for (var i = 0; i < matches.Count; i++) mArgs[i] = matches[i].Value.Trim('"'); // Removing the quotes around the arguments
+        }
+
+        public int Count()
+        {
+            return mArgs.Length;
+        }
+
+        public string GetString()
+        {
+            if (mIndex >= mArgs.Length) return null;
+            return mArgs[mIndex++];
+        }
+
+        public int? GetInt()
+        {
+            if (mIndex >= mArgs.Length) return null;
+            //try parse
+            if (!int.TryParse(mArgs[mIndex++], out var result)) return null;
+            return result;
+        }
+
+        public float GetFloat()
+        {
+            if (mIndex >= mArgs.Length) return 0;
+            return float.Parse(mArgs[mIndex++]);
+        }
+
+        public bool GetBool()
+        {
+            if (mIndex >= mArgs.Length) return false;
+            return bool.Parse(mArgs[mIndex++]);
+        }
     }
 }
