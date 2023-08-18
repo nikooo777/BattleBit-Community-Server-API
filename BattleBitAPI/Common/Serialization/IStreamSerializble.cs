@@ -1,7 +1,8 @@
-﻿namespace BattleBitAPI.Common.Serialization;
-
-public interface IStreamSerializable
+﻿namespace BattleBitAPI.Common.Serialization
 {
-    void Read(Stream ser);
-    void Write(Stream ser);
+    public interface IStreamSerializable
+    {
+        void Read(Stream ser);
+        void Write(Stream ser);
+    }
 }

@@ -1,17 +1,18 @@
-﻿using Stream = BattleBitAPI.Common.Serialization.Stream;
+﻿using System;
 
-namespace BattleBitAPI.Common;
-
-public class PlayerJoiningArguments
+namespace BattleBitAPI.Common
 {
-    public Squads Squad;
-    public PlayerStats Stats;
-    public Team Team;
-
-    public void Write(Stream ser)
+    public class PlayerJoiningArguments
     {
-        Stats.Write(ser);
-        ser.Write((byte)Team);
-        ser.Write((byte)Squad);
+        public PlayerStats Stats;
+        public Team Team;
+        public Squads Squad;
+
+        public void Write(BattleBitAPI.Common.Serialization.Stream ser)
+        {
+            this.Stats.Write(ser);
+            ser.Write((byte)this.Team);
+            ser.Write((byte)this.Squad);
+        }
     }
 }

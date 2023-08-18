@@ -1,8 +1,7 @@
-﻿namespace BattleBitAPI.Common;
-
-public enum LeaningSide
+﻿namespace BattleBitAPI.Common
 {
-    Left,
-    None,
-    Right
+    public enum LeaningSide
+    {
+        Left, None, Right
+    }
 }

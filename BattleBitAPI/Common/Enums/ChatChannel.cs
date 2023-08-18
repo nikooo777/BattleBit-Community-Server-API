@@ -1,8 +1,9 @@
-﻿namespace BattleBitAPI.Common;
-
-public enum ChatChannel
+﻿namespace BattleBitAPI.Common
 {
-    AllChat,
-    TeamChat,
-    SquadChat
+    public enum ChatChannel
+    {
+        AllChat, 
+        TeamChat, 
+        SquadChat
+    }
 }

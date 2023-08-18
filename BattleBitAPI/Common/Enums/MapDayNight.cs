@@ -1,7 +1,8 @@
-﻿namespace BattleBitAPI.Common;
-
-public enum MapDayNight : byte
+﻿namespace BattleBitAPI.Common
 {
-    Day = 0,
-    Night = 1
+    public enum MapDayNight : byte
+    {
+        Day = 0,
+        Night = 1,
+    }
 }

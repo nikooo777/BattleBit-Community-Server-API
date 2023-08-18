@@ -1,76 +1,73 @@
-﻿namespace BattleBitAPI.Common;
+﻿using System;
 
-public class Weapon : IEquatable<string>, IEquatable<Weapon>
+namespace BattleBitAPI.Common
 {
-    public Weapon(string name, WeaponType weaponType)
+    public class Weapon : IEquatable<string>, IEquatable<Weapon>
     {
-        Name = name;
-        WeaponType = weaponType;
-    }
+        public string Name { get; private set; }
+        public WeaponType WeaponType { get; private set; }
+        public Weapon(string name, WeaponType weaponType)
+        {
+            Name = name;
+            WeaponType = weaponType;
+        }
 
-    public string Name { get; }
-    public WeaponType WeaponType { get; private set; }
+        public override string ToString()
+        {
+            return this.Name;
+        }
+        public bool Equals(string other)
+        {
+            if (other == null)
+                return false;
+            return this.Name.Equals(other);
+        }
+        public bool Equals(Weapon other)
+        {
+            if (other == null)
+                return false;
+            return this.Name.Equals(other.Name);
+        }
 
-    public bool Equals(string other)
-    {
-        if (other == null)
-            return false;
-        return Name.Equals(other);
-    }
-
-    public bool Equals(Weapon other)
-    {
-        if (other == null)
-            return false;
-        return Name.Equals(other.Name);
-    }
-
-    public override string ToString()
-    {
-        return Name;
-    }
-
-    public static bool operator ==(string left, Weapon right)
-    {
-        var leftNull = ReferenceEquals(left, null);
-        var rightNull = ReferenceEquals(right, null);
-        if (leftNull && rightNull)
-            return true;
-        if (leftNull || rightNull)
-            return false;
-        return right.Name.Equals(left);
-    }
-
-    public static bool operator !=(string left, Weapon right)
-    {
-        var leftNull = ReferenceEquals(left, null);
-        var rightNull = ReferenceEquals(right, null);
-        if (leftNull && rightNull)
-            return true;
-        if (leftNull || rightNull)
-            return false;
-        return right.Name.Equals(left);
-    }
-
-    public static bool operator ==(Weapon right, string left)
-    {
-        var leftNull = ReferenceEquals(left, null);
-        var rightNull = ReferenceEquals(right, null);
-        if (leftNull && rightNull)
-            return true;
-        if (leftNull || rightNull)
-            return false;
-        return right.Name.Equals(left);
-    }
-
-    public static bool operator !=(Weapon right, string left)
-    {
-        var leftNull = ReferenceEquals(left, null);
-        var rightNull = ReferenceEquals(right, null);
-        if (leftNull && rightNull)
-            return true;
-        if (leftNull || rightNull)
-            return false;
-        return right.Name.Equals(left);
+        public static bool operator ==(string left, Weapon right)
+        {
+            bool leftNull = object.ReferenceEquals(left, null);
+            bool rightNull = object.ReferenceEquals(right, null);
+            if (leftNull && rightNull)
+                return true;
+            if (leftNull || rightNull)
+                return false;
+            return right.Name.Equals(left);
+        }
+        public static bool operator !=(string left, Weapon right)
+        {
+            bool leftNull = object.ReferenceEquals(left, null);
+            bool rightNull = object.ReferenceEquals(right, null);
+            if (leftNull && rightNull)
+                return true;
+            if (leftNull || rightNull)
+                return false;
+            return right.Name.Equals(left);
+        }
+        public static bool operator ==(Weapon right, string left)
+        {
+            bool leftNull = object.ReferenceEquals(left, null);
+            bool rightNull = object.ReferenceEquals(right, null);
+            if (leftNull && rightNull)
+                return true;
+            if (leftNull || rightNull)
+                return false;
+            return right.Name.Equals(left);
+        }
+        public static bool operator !=(Weapon right, string left)
+        {
+            bool leftNull = object.ReferenceEquals(left, null);
+            bool rightNull = object.ReferenceEquals(right, null);
+            if (leftNull && rightNull)
+                return true;
+            if (leftNull || rightNull)
+                return false;
+            return right.Name.Equals(left);
+        }
     }
 }

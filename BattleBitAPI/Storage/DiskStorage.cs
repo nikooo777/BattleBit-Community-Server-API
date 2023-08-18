@@ -1,45 +1,41 @@
 ﻿using BattleBitAPI.Common;
 
-namespace BattleBitAPI.Storage;
-
-public class DiskStorage : IPlayerStatsDatabase
+namespace BattleBitAPI.Storage
 {
-    private readonly string mDirectory;
-
-    public DiskStorage(string directory)
+    public class DiskStorage : IPlayerStatsDatabase
     {
-        var info = new DirectoryInfo(directory);
-        if (!info.Exists)
-            info.Create();
+        private string mDirectory;
+        public DiskStorage(string directory)
+        {
+            var info = new DirectoryInfo(directory);
+            if (!info.Exists)
+                info.Create();
 
-        mDirectory = info.FullName + Path.DirectorySeparatorChar;
-    }
+            this.mDirectory = info.FullName + Path.DirectorySeparatorChar;
+        }
 
-    public async Task<PlayerStats> GetPlayerStatsOf(ulong steamID)
-    {
-        var file = mDirectory + steamID + ".data";
-        if (File.Exists(file))
+        public async Task<PlayerStats> GetPlayerStatsOf(ulong steamID)
+        {
+            var file = this.mDirectory + steamID + ".data";
+            if (File.Exists(file))
+            {
+                try
+                {
+                    var data = await File.ReadAllBytesAsync(file);
+                    return new PlayerStats(data);
+                }
+                catch { }
+            }
+            return null;
+        }
+        public async Task SavePlayerStatsOf(ulong steamID, PlayerStats stats)
+        {
+            var file = this.mDirectory + steamID + ".data";
             try
             {
-                var data = await File.ReadAllBytesAsync(file);
-                return new PlayerStats(data);
+                await File.WriteAllBytesAsync(file, stats.SerializeToByteArray());
             }
-            catch
-            {
-            }
-
-        return null;
-    }
-
-    public async Task SavePlayerStatsOf(ulong steamID, PlayerStats stats)
-    {
-        var file = mDirectory + steamID + ".data";
-        try
-        {
-            await File.WriteAllBytesAsync(file, stats.SerializeToByteArray());
-        }
-        catch
-        {
+            catch { }
         }
     }
 }
