@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Sockets;
 
 namespace BattleBitAPI.Common.Extentions
@@ -33,8 +33,7 @@ namespace BattleBitAPI.Common.Extentions
 
         public static void SafeClose(this TcpClient client)
         {
-            try { client.Close(); } catch { }
-            try { client.Dispose(); } catch { }
+            client.Dispose();
         }
         public static async Task<int> Read(this NetworkStream networkStream, Serialization.Stream outputStream, int size, CancellationToken token = default)
         {

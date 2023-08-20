@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CommunityServerAPI", "Commu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BattleBitAPI.Program", "..\BattleBitAPI.Program\BattleBitAPI.Program.csproj", "{96D55E1B-2711-47E2-9DA1-41B645F4FCF2}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SAT", "SAT\SAT.csproj", "{9802C364-4DE6-4CB7-9388-D60B8AA3889E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{96D55E1B-2711-47E2-9DA1-41B645F4FCF2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{96D55E1B-2711-47E2-9DA1-41B645F4FCF2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{96D55E1B-2711-47E2-9DA1-41B645F4FCF2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9802C364-4DE6-4CB7-9388-D60B8AA3889E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9802C364-4DE6-4CB7-9388-D60B8AA3889E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9802C364-4DE6-4CB7-9388-D60B8AA3889E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9802C364-4DE6-4CB7-9388-D60B8AA3889E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

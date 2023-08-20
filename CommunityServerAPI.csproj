@@ -26,6 +26,15 @@
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
+    <None Remove="SAT\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="SAT\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Remove="SAT\**" />
   </ItemGroup>
 
 </Project>
