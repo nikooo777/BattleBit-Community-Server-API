@@ -1,8 +1,11 @@
 ﻿using BattleBitAPI;
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
-using CommunityServerAPI.AdminTools;
 using CommunityServerAPI.Storage;
+using SAT.Storage;
+using SAT.SwissAdminTools;
+
+namespace SwissAdminTools;
 
 internal class Program
 {
@@ -10,8 +13,8 @@ internal class Program
     {
         const int port = 1337;
         var listener = new ServerListener<MyPlayer, MyGameServer>();
-        listener.OnCreatingGameServerInstance += OnCreatingGameServerInstance;
-        listener.OnCreatingPlayerInstance += OnCreatingPlayerInstance;
+        // listener.OnCreatingGameServerInstance += OnCreatingGameServerInstance;
+        // listener.OnCreatingPlayerInstance += OnCreatingPlayerInstance;
         listener.OnGameServerConnected += async server =>
         {
             Console.WriteLine($"Gameserver connected! {server.GameIP}:{server.GamePort} {server.ServerName}");
@@ -22,20 +25,6 @@ internal class Program
         Console.WriteLine($"APIs Server started on port {port}");
         Thread.Sleep(-1);
     }
-
-    private static MyPlayer OnCreatingPlayerInstance()
-    {
-        return new MyPlayer();
-    }
-
-    private static MyGameServer OnCreatingGameServerInstance()
-    {
-        return new MyGameServer();
-    }
-}
-
-public class MyPlayer : Player<MyPlayer>
-{
 }
 
 internal class MyGameServer : GameServer<MyPlayer>
@@ -96,7 +85,7 @@ internal class MyGameServer : GameServer<MyPlayer>
         return Task.FromResult(false);
     }
 
-    public override async Task<OnPlayerSpawnArguments> OnPlayerSpawning(MyPlayer player, OnPlayerSpawnArguments request)
+    public override async Task<OnPlayerSpawnArguments?> OnPlayerSpawning(MyPlayer player, OnPlayerSpawnArguments request)
     {
         if (AdminTools.IsWeaponRestricted(request.Loadout.PrimaryWeapon.Tool))
         {
@@ -126,4 +115,8 @@ internal class MyGameServer : GameServer<MyPlayer>
 
         return request;
     }
+}
+
+public class MyPlayer : Player<MyPlayer>
+{
 }

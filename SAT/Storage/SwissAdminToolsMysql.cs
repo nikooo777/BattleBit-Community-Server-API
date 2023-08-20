@@ -1,8 +1,9 @@
 using System.Collections.Concurrent;
 using BattleBitAPI.Common;
+using CommunityServerAPI.Storage;
 using MySql.Data.MySqlClient;
 
-namespace CommunityServerAPI.Storage;
+namespace SAT.Storage;
 
 public class SwissAdminToolsMysql : SwissAdminToolsStore
 {

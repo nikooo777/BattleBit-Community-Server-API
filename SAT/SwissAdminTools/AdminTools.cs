@@ -2,8 +2,10 @@ using System.Numerics;
 using System.Text.RegularExpressions;
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
+using CommunityServerAPI;
+using SwissAdminTools;
 
-namespace CommunityServerAPI.AdminTools;
+namespace SAT.SwissAdminTools;
 
 public static class AdminTools
 {
@@ -187,7 +189,7 @@ public static class AdminTools
 
         //convert minutes to human readable string (if minutes are hours or days, that is used instead)
         var lengthMessage = LengthFromSeconds(lengthMinutes * 60);
-        var reason = args.Count() > 2 ? args.GetString() : "Gagged by admin";
+        var reason = args.Count() > 2 ? args.GetRemainingString() : "Gagged by admin";
 
         try
         {
@@ -211,13 +213,13 @@ public static class AdminTools
 
     private static bool SayCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
     {
-        server.SayToChat($"{RichText.Red}[{RichText.Bold("ADMIN")}]: {RichText.Magenta}{RichText.Italic(args.GetString())}");
+        server.SayToAllChat($"{RichText.Red}[{RichText.Bold("ADMIN")}]: {RichText.Magenta}{RichText.Italic(args.GetRemainingString())}");
         return false;
     }
 
     private static bool ClearCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
     {
-        server.SayToChat($"\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n{RichText.Size(".", 0)}");
+        server.SayToAllChat($"\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n{RichText.Size(".", 0)}");
         return false;
     }
 
@@ -230,7 +232,7 @@ public static class AdminTools
         }
 
         var targets = FindTarget(args.GetString(), sender, server);
-        var reason = args.Count() > 1 ? args.GetString() : "Kicked by admin";
+        var reason = args.Count() > 1 ? args.GetRemainingString() : "Kicked by admin";
         try
         {
             targets.ToList().ForEach(t =>
@@ -278,13 +280,7 @@ public static class AdminTools
             return false;
         }
 
-        if (args.Count() > 1)
-        {
-            server.MessageToPlayer(sender, "wrap your command in quotes");
-            return false;
-        }
-
-        server.ExecuteCommand(args.GetString());
+        server.ExecuteCommand(args.GetRemainingString());
         return true;
     }
 
@@ -307,7 +303,7 @@ public static class AdminTools
 
         var lengthMinutes = mins.Value;
 
-        var reason = args.Count() > 2 ? args.GetString() : "Banned by admin";
+        var reason = args.Count() > 2 ? args.GetRemainingString() : "Banned by admin";
 
         //convert minutes to human readable string (if minutes are hours or days, that is used instead)
         var lengthMessage = LengthFromSeconds(lengthMinutes * 60);
@@ -445,6 +441,14 @@ public static class AdminTools
         {
             if (mIndex >= mArgs.Length) return null;
             return mArgs[mIndex++];
+        }
+        
+        public string GetRemainingString()
+        {
+            if (mIndex >= mArgs.Length) return null;
+            var result = string.Join(" ", mArgs[mIndex..]);
+            mIndex = mArgs.Length;
+            return result;
         }
 
         public int? GetInt()
