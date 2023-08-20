@@ -6,8 +6,6 @@ using CommunityServerAPI.Storage;
 
 internal class Program
 {
-    public static SwissAdminToolsStore Sat { get; set; }
-
     private static void Main(string[] args)
     {
         const int port = 1337;
@@ -20,8 +18,7 @@ internal class Program
             server.ServerSettings.PlayerCollision = true;
         };
         listener.Start(port);
-        const string connectionString = "server=localhost;user=battlebit;password=battlebit;database=battlebit";
-        Sat = new SwissAdminToolsMysql(connectionString);
+
         Console.WriteLine($"APIs Server started on port {port}");
         Thread.Sleep(-1);
     }
@@ -43,6 +40,14 @@ public class MyPlayer : Player<MyPlayer>
 
 internal class MyGameServer : GameServer<MyPlayer>
 {
+    public MyGameServer()
+    {
+        const string connectionString = "server=localhost;user=battlebit;password=battlebit;database=battlebit";
+        Sat = new SwissAdminToolsMysql(connectionString);
+    }
+
+    public static SwissAdminToolsStore Sat { get; set; }
+
     public override async Task OnConnected()
     {
         ForceStartGame();
@@ -69,7 +74,7 @@ internal class MyGameServer : GameServer<MyPlayer>
     {
         try
         {
-            Program.Sat.StorePlayer(steamId, args);
+            Sat.StorePlayer(steamId, args);
         }
         catch (Exception ex)
         {
@@ -81,7 +86,7 @@ internal class MyGameServer : GameServer<MyPlayer>
 
     public override Task<bool> OnPlayerTypedMessage(MyPlayer player, ChatChannel channel, string msg)
     {
-        Program.Sat.StoreChatLog(player.SteamID, msg);
+        Sat.StoreChatLog(player.SteamID, msg);
         var res = AdminTools.ProcessChat(msg, player, this);
         if (!res) return Task.FromResult(false);
 
