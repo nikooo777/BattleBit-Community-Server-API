@@ -2,8 +2,12 @@
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
 using CommunityServerAPI.Storage;
+using SAT.Models;
 using SAT.Storage;
 using SAT.SwissAdminTools;
+using Admin = SAT.SwissAdminTools.Admin;
+using BlockType = SAT.SwissAdminTools.BlockType;
+using ChatLog = SAT.Models.ChatLog;
 
 namespace SwissAdminTools;
 
@@ -27,15 +31,17 @@ internal class Program
     }
 }
 
-internal class MyGameServer : GameServer<MyPlayer>
+public class MyGameServer : GameServer<MyPlayer>
 {
     public MyGameServer()
     {
         const string connectionString = "server=localhost;user=battlebit;password=battlebit;database=battlebit";
+        Db = new BattlebitContext();
         Sat = new SwissAdminToolsMysql(connectionString);
     }
 
     public static SwissAdminToolsStore Sat { get; set; }
+    public static BattlebitContext Db { get; set; }
 
     public override async Task OnConnected()
     {
@@ -48,7 +54,7 @@ internal class MyGameServer : GameServer<MyPlayer>
 
     public override async Task OnPlayerConnected(MyPlayer player)
     {
-        var blockDetails = AdminTools.IsBlocked(player.SteamID, AdminTools.BlockType.Ban);
+        var blockDetails = Blocks.IsBlocked(player.SteamID, BlockType.Ban);
         if (blockDetails.isBlocked)
         {
             player.Kick(blockDetails.reason);
@@ -63,7 +69,83 @@ internal class MyGameServer : GameServer<MyPlayer>
     {
         try
         {
-            Sat.StorePlayer(steamId, args);
+            var isAdmin = Admin.IsPlayerAdmin(steamId);
+            if (isAdmin) args.Stats.Roles = Roles.Admin;
+            var existingPlayer = Db.Players.FirstOrDefault(player => (long)steamId == player.SteamId);
+            if (existingPlayer != null)
+            {
+                // Update player
+                existingPlayer.IsBanned = args.Stats.IsBanned;
+                existingPlayer.Roles = (int)args.Stats.Roles;
+                existingPlayer.Achievements = args.Stats.Achievements;
+                existingPlayer.Selections = args.Stats.Selections;
+                existingPlayer.ToolProgress = args.Stats.ToolProgress;
+                Db.SaveChanges();
+                return Task.CompletedTask;
+            }
+
+            var newPlayer = Db.Players.Add(new Player
+            {
+                SteamId = (long)steamId,
+                IsBanned = args.Stats.IsBanned,
+                Roles = (int)args.Stats.Roles,
+                Achievements = args.Stats.Achievements,
+                Selections = args.Stats.Selections,
+                ToolProgress = args.Stats.ToolProgress,
+                CreatedAt = default,
+                UpdatedAt = default,
+                ChatLogs = new List<ChatLog>(),
+                PlayerProgress = new PlayerProgress
+                {
+                    KillCount = args.Stats.Progress.KillCount,
+                    DeathCount = args.Stats.Progress.DeathCount,
+                    LeaderKills = args.Stats.Progress.LeaderKills,
+                    AssaultKills = args.Stats.Progress.AssaultKills,
+                    MedicKills = args.Stats.Progress.MedicKills,
+                    EngineerKills = args.Stats.Progress.EngineerKills,
+                    SupportKills = args.Stats.Progress.SupportKills,
+                    ReconKills = args.Stats.Progress.ReconKills,
+                    WinCount = args.Stats.Progress.WinCount,
+                    LoseCount = args.Stats.Progress.LoseCount,
+                    FriendlyShots = args.Stats.Progress.FriendlyShots,
+                    FriendlyKills = args.Stats.Progress.FriendlyKills,
+                    Revived = args.Stats.Progress.Revived,
+                    RevivedTeamMates = args.Stats.Progress.RevivedTeamMates,
+                    Assists = args.Stats.Progress.Assists,
+                    Prestige = args.Stats.Progress.Prestige,
+                    CurrentRank = args.Stats.Progress.Rank,
+                    Exp = args.Stats.Progress.EXP,
+                    ShotsFired = args.Stats.Progress.ShotsFired,
+                    ShotsHit = args.Stats.Progress.ShotsHit,
+                    Headshots = args.Stats.Progress.Headshots,
+                    CompletedObjectives = args.Stats.Progress.ObjectivesComplated,
+                    HealedHps = args.Stats.Progress.HealedHPs,
+                    RoadKills = args.Stats.Progress.RoadKills,
+                    Suicides = args.Stats.Progress.Suicides,
+                    VehiclesDestroyed = args.Stats.Progress.VehiclesDestroyed,
+                    VehicleHpRepaired = args.Stats.Progress.VehicleHPRepaired,
+                    LongestKill = args.Stats.Progress.LongestKill,
+                    PlayTimeSeconds = args.Stats.Progress.PlayTimeSeconds,
+                    LeaderPlayTime = args.Stats.Progress.LeaderPlayTime,
+                    AssaultPlayTime = args.Stats.Progress.AssaultPlayTime,
+                    MedicPlayTime = args.Stats.Progress.MedicPlayTime,
+                    EngineerPlayTime = args.Stats.Progress.EngineerPlayTime,
+                    SupportPlayTime = args.Stats.Progress.SupportPlayTime,
+                    ReconPlayTime = args.Stats.Progress.ReconPlayTime,
+                    LeaderScore = args.Stats.Progress.LeaderScore,
+                    AssaultScore = args.Stats.Progress.AssaultScore,
+                    MedicScore = args.Stats.Progress.MedicScore,
+                    EngineerScore = args.Stats.Progress.EngineerScore,
+                    SupportScore = args.Stats.Progress.SupportScore,
+                    ReconScore = args.Stats.Progress.ReconScore,
+                    TotalScore = args.Stats.Progress.TotalScore,
+                    CreatedAt = default,
+                    UpdatedAt = default
+                },
+                PlayerReportReportedPlayers = new List<PlayerReport>(),
+                PlayerReportReporters = new List<PlayerReport>()
+            });
+            Db.SaveChanges();
         }
         catch (Exception ex)
         {
@@ -79,7 +161,7 @@ internal class MyGameServer : GameServer<MyPlayer>
         var res = AdminTools.ProcessChat(msg, player, this);
         if (!res) return Task.FromResult(false);
 
-        var blockResult = AdminTools.IsBlocked(player.SteamID, AdminTools.BlockType.Gag);
+        var blockResult = Blocks.IsBlocked(player.SteamID, BlockType.Gag);
         if (!blockResult.isBlocked) return Task.FromResult(true);
         player.WarnPlayer($"You are currently gagged: {blockResult.reason}");
         return Task.FromResult(false);
@@ -114,6 +196,25 @@ internal class MyGameServer : GameServer<MyPlayer>
         }, null, 2000, Timeout.Infinite);
 
         return request;
+    }
+
+    public override Task OnPlayerReported(MyPlayer from, MyPlayer to, ReportReason reason, string additional)
+    {
+        var reporterID = Db.Players.FirstOrDefault(player => player.SteamId == (long)from.SteamID)?.Id;
+        var reportedPlayerID = Db.Players.FirstOrDefault(player => player.SteamId == (long)to.SteamID);
+        if (reporterID == null || reportedPlayerID == null) return Task.CompletedTask;
+
+        var report = new PlayerReport
+        {
+            ReporterId = reporterID.Value,
+            Reason = reason + " " + additional,
+            Status = "Pending",
+            AdminNotes = null,
+            ReportedPlayer = reportedPlayerID
+        };
+        Db.PlayerReports.Add(report);
+        Db.SaveChanges();
+        return Task.CompletedTask;
     }
 }
 

@@ -3,20 +3,21 @@ using System.Text.RegularExpressions;
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
 using CommunityServerAPI;
+using SAT.Utils;
 using SwissAdminTools;
 
 namespace SAT.SwissAdminTools;
 
+public enum BlockType
+{
+    Ban,
+    Gag,
+    Mute
+}
+
 public static class AdminTools
 {
-    public enum BlockType
-    {
-        Ban,
-        Gag,
-        Mute
-    }
-
-    private static readonly Dictionary<string, Func<Arguments, MyPlayer, GameServer<MyPlayer>, bool>> Commands = new()
+    private static readonly Dictionary<string, Func<Arguments, MyPlayer, GameServer<MyPlayer>, Models.Admin, bool>> Commands = new()
     {
         { "say", SayCmd },
         { "clear", ClearCmd },
@@ -33,36 +34,11 @@ public static class AdminTools
         // { "", Cmd }
     };
 
-    private static readonly Dictionary<ulong, (long timestamp, string reason)> BannedPlayers = new();
-    private static readonly Dictionary<ulong, (long timestamp, string reason)> GaggedPlayers = new();
-    private static readonly Dictionary<ulong, (long timestamp, string reason)> MutedPlayers = new();
+
     private static readonly List<Weapon> BlockedWeapons = new();
 
     private static readonly Dictionary<ulong, Vector3> TeleportCoords = new();
 
-
-    public static (bool isBlocked, string reason) IsBlocked(ulong steamId, BlockType blockType)
-    {
-        var blockDict = blockType switch
-        {
-            BlockType.Ban => BannedPlayers,
-            BlockType.Gag => GaggedPlayers,
-            BlockType.Mute => MutedPlayers,
-            _ => throw new ArgumentOutOfRangeException(nameof(blockType), blockType, null)
-        };
-
-        if (!blockDict.TryGetValue(steamId, out var block))
-            return (false, "");
-
-        var unixTime = ((DateTimeOffset)DateTime.UtcNow).ToUnixTimeSeconds();
-        var formattedLength = LengthFromSeconds(block.timestamp - unixTime);
-
-        if (unixTime <= block.timestamp)
-            return (true, $"{block.reason} (length: {formattedLength})");
-
-        blockDict.Remove(steamId);
-        return (false, "");
-    }
 
     public static bool IsWeaponRestricted(Weapon weapon)
     {
@@ -72,7 +48,16 @@ public static class AdminTools
 
     public static bool ProcessChat(string message, MyPlayer sender, GameServer<MyPlayer> server)
     {
-        if (message.StartsWith("@")) return SayCmd(new Arguments(message.TrimStart('@')), sender, server);
+        // this should be adjusted to be more flexible and precise
+        var issuerAdmin = Admin.GetAdmin(sender.SteamID);
+        if ((message.StartsWith("@") || message.StartsWith("!")) && issuerAdmin == null)
+        {
+            sender.Message("You don't have enough permissions to use this command");
+            return true;
+        }
+
+
+        if (message.StartsWith("@")) return SayCmd(new Arguments(message.TrimStart('@')), sender, server, issuerAdmin!);
         if (!message.StartsWith("!")) return true;
 
         message = message.TrimStart('!');
@@ -83,21 +68,10 @@ public static class AdminTools
         var command = split[0];
         if (!Commands.ContainsKey(command)) return true;
 
-        if (split.Length == 1)
-            try
-            {
-                return Commands[command](new Arguments(""), sender, server);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error: {ex.Message}");
-                return false;
-            }
-
-        var args = split[1];
+        var args = split.Length == 1 ? new Arguments("") : new Arguments(split[1]);
         try
         {
-            return Commands[command](new Arguments(args), sender, server);
+            return Commands[command](args, sender, server, issuerAdmin!);
         }
         catch (Exception ex)
         {
@@ -106,7 +80,7 @@ public static class AdminTools
         }
     }
 
-    private static bool RestrictCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    private static bool RestrictCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
     {
         if (args.Count() != 2)
         {
@@ -139,19 +113,20 @@ public static class AdminTools
         return false;
     }
 
-    private static bool SaveLocCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    private static bool SaveLocCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
     {
         var loc = sender.Position;
         TeleportCoords[sender.SteamID] = loc;
         return false;
     }
 
-    private static bool TeleportCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    private static bool TeleportCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
     {
         TeleportCoords.TryGetValue(sender.SteamID, out var loc);
         try
         {
-            var targets = FindTarget(args.GetString(), sender, server).ToList();
+            if (args.Count() < 1) sender.Message("Invalid number of arguments for teleport command (!tele <target>)");
+            var targets = FindTarget(args.GetString()!, sender, server).ToList();
             targets.ForEach(t =>
             {
                 server.UILogOnServer($"{t.Name} was teleported", 3f);
@@ -167,7 +142,7 @@ public static class AdminTools
         return false;
     }
 
-    private static bool GagCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    private static bool GagCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
     {
         //!gag <target> <length> <optional reason>
         if (args.Count() < 2)
@@ -176,7 +151,7 @@ public static class AdminTools
             return false;
         }
 
-        var targets = FindTarget(args.GetString(), sender, server);
+        var targets = FindTarget(args.GetString()!, sender, server);
 
         var mins = args.GetInt();
         if (mins == null)
@@ -188,7 +163,7 @@ public static class AdminTools
         var lengthMinutes = mins.Value;
 
         //convert minutes to human readable string (if minutes are hours or days, that is used instead)
-        var lengthMessage = LengthFromSeconds(lengthMinutes * 60);
+        var lengthMessage = Formatting.LengthFromSeconds(lengthMinutes * 60);
         var reason = args.Count() > 2 ? args.GetRemainingString() : "Gagged by admin";
 
         try
@@ -198,7 +173,7 @@ public static class AdminTools
                 var gagExpiry = ((DateTimeOffset)DateTime.UtcNow).ToUnixTimeSeconds() + lengthMinutes * 60;
                 if (lengthMinutes <= 0) gagExpiry = DateTime.MaxValue.Ticks;
 
-                GaggedPlayers.Add(t.SteamID, new ValueTuple<long, string>(gagExpiry, reason));
+                Blocks.SetBlock(t.SteamID, BlockType.Gag, reason!, gagExpiry, issuerAdmin);
                 server.UILogOnServer($"{t.Name} was gagged: {reason} ({lengthMessage})", 4f);
             });
         }
@@ -211,19 +186,19 @@ public static class AdminTools
         return false;
     }
 
-    private static bool SayCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    private static bool SayCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
     {
         server.SayToAllChat($"{RichText.Red}[{RichText.Bold("ADMIN")}]: {RichText.Magenta}{RichText.Italic(args.GetRemainingString())}");
         return false;
     }
 
-    private static bool ClearCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    private static bool ClearCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
     {
         server.SayToAllChat($"\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n{RichText.Size(".", 0)}");
         return false;
     }
 
-    private static bool KickCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    private static bool KickCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
     {
         if (args.Count() < 1)
         {
@@ -231,7 +206,7 @@ public static class AdminTools
             return false;
         }
 
-        var targets = FindTarget(args.GetString(), sender, server);
+        var targets = FindTarget(args.GetString()!, sender, server);
         var reason = args.Count() > 1 ? args.GetRemainingString() : "Kicked by admin";
         try
         {
@@ -250,11 +225,12 @@ public static class AdminTools
         return false;
     }
 
-    private static bool SlayCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    private static bool SlayCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
     {
         try
         {
-            var targets = FindTarget(args.GetString(), sender, server).ToList();
+            if (args.Count() < 1) sender.Message("Invalid number of arguments for slay command (!slay <target>)");
+            var targets = FindTarget(args.GetString()!, sender, server).ToList();
             targets.ForEach(t =>
             {
                 server.UILogOnServer($"{t.Name} was slayed", 3f);
@@ -270,7 +246,7 @@ public static class AdminTools
         return false;
     }
 
-    private static bool RconCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    private static bool RconCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
     {
         if (sender.SteamID != 76561197997290818) return false;
 
@@ -284,7 +260,7 @@ public static class AdminTools
         return true;
     }
 
-    private static bool BanCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    private static bool BanCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
     {
         //!ban <target> <length> <optional reason>
         if (args.Count() < 2)
@@ -293,7 +269,7 @@ public static class AdminTools
             return false;
         }
 
-        var targets = FindTarget(args.GetString(), sender, server);
+        var targets = FindTarget(args.GetString()!, sender, server);
         var mins = args.GetInt();
         if (mins == null)
         {
@@ -306,7 +282,7 @@ public static class AdminTools
         var reason = args.Count() > 2 ? args.GetRemainingString() : "Banned by admin";
 
         //convert minutes to human readable string (if minutes are hours or days, that is used instead)
-        var lengthMessage = LengthFromSeconds(lengthMinutes * 60);
+        var lengthMessage = Formatting.LengthFromSeconds(lengthMinutes * 60);
 
         try
         {
@@ -315,7 +291,7 @@ public static class AdminTools
                 var banExpiry = ((DateTimeOffset)DateTime.UtcNow).ToUnixTimeSeconds() + lengthMinutes * 60;
                 if (lengthMinutes <= 0) banExpiry = DateTime.MaxValue.Ticks;
 
-                BannedPlayers.Add(t.SteamID, new ValueTuple<long, string>(banExpiry, reason));
+                Blocks.SetBlock(t.SteamID, BlockType.Ban, reason!, banExpiry, issuerAdmin);
                 server.Kick(t, reason + $" {lengthMessage}");
                 server.UILogOnServer($"{t.Name} was banned from the server: {reason} ({lengthMessage})", 4f);
             });
@@ -329,18 +305,6 @@ public static class AdminTools
         return false;
     }
 
-    private static string LengthFromSeconds(long lengthSeconds)
-    {
-        var lengthMinutes = lengthSeconds / 60f;
-        return lengthMinutes switch
-        {
-            <= 0 => "permanently",
-            < 1 => $"{lengthSeconds:0} seconds",
-            < 60 => $"{lengthMinutes:0.0} minutes",
-            < 1440 => $"{lengthMinutes / 60f:0.0} hours",
-            _ => $"{lengthMinutes / 1440f:0.0} days"
-        };
-    }
 
     /// FindTarget returns a list of steamIds based on the target string
     /// if the target filter is a partial name or steamId then it will only allow returning one player
@@ -437,13 +401,13 @@ public static class AdminTools
             return mArgs.Length;
         }
 
-        public string GetString()
+        public string? GetString()
         {
             if (mIndex >= mArgs.Length) return null;
             return mArgs[mIndex++];
         }
-        
-        public string GetRemainingString()
+
+        public string? GetRemainingString()
         {
             if (mIndex >= mArgs.Length) return null;
             var result = string.Join(" ", mArgs[mIndex..]);
