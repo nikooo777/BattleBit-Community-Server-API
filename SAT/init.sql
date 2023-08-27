@@ -119,4 +119,4 @@ CREATE TABLE `player_reports`
     CONSTRAINT `player_reports_ibfk_2` FOREIGN KEY (`reported_player_id`) REFERENCES `player` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
+  COLLATE = utf8mb4_unicode_ci;

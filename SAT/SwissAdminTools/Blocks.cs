@@ -29,7 +29,6 @@ public class Blocks
             BlockType = blockType.ToString(),
             Reason = reason,
             ExpiryDate = DateTimeOffset.FromUnixTimeSeconds(expiresAt).DateTime,
-            IssuerAdminId = 0,
             TargetIp = null,
             AdminIp = null,
             IssuerAdmin = issuerAdmin
