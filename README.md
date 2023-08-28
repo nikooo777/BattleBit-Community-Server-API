@@ -19,7 +19,9 @@ Current features are:
 - `!gag <target> <length in minutes> <optional reason>` gags a player from the server.
 - `!saveloc` saves the current location of the player.
 - `!tele <target>` teleports the player to the saved location.
-- `!restrict <weapon>` restricts a weapon from being used by the player.
+- `!teleto <target>` teleport to the player.
+- `!restrict <weapon>` restricts a weapon from being used by the player. Weapon types also allowed with a `#` (e.g. `!restrict #SniperRifle`).
+- `!gravity <target> <value>` sets the gravity multiplier for the player (0.1-10).
 - `!rcon <command>` executes a rcon command on the server. (must be wrapped in quotes if it contains spaces)
 
 An additional feature is that all chat messages are logged to a file named `chat_date-here.log` in the same directory as
@@ -100,7 +102,8 @@ Alternatively, you can use Docker to run it. An easy way to do this it to run `d
 
 ### Connecting to the gameserver(s)
 
-After writing and compiling this project. You will want to host it somewhere. This could be on the same server that the gameservers run on, or somewhere completely different. We do recommend to keep the latency to the gameserver minimal for smoother and faster communication. The same `ServerListener` can be used for *multiple* gameservers at the same time. You can specify the API server (address & port) in the launch options of the gameserver.
+After writing and compiling this project. You will want to host it somewhere. This could be on the same server that the gameservers run on, or somewhere completely different. We do recommend to keep the latency to the gameserver minimal for smoother and faster communication. The same `ServerListener` can be used for
+*multiple* gameservers at the same time. You can specify the API server (address & port) in the launch options of the gameserver.
 
 #### Gameserver start arguments
 

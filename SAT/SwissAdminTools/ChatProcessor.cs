@@ -15,7 +15,7 @@ public enum BlockType
     Mute
 }
 
-public static class AdminTools
+public static class ChatProcessor
 {
     private static readonly Dictionary<string, Func<Arguments, MyPlayer, GameServer<MyPlayer>, Models.Admin, bool>> Commands = new()
     {
@@ -27,23 +27,16 @@ public static class AdminTools
         { "gag", GagCmd },
         { "saveloc", SaveLocCmd },
         { "tele", TeleportCmd },
+        { "teleto", TeleportToCmd },
         { "restrict", RestrictCmd },
-        { "rcon", RconCmd }
-        // { "gravity", GravityCmd },
+        { "rcon", RconCmd },
+        { "gravity", GravityCmd }
         // { "speed", SpeedCmd },
         // { "", Cmd }
     };
 
 
-    private static readonly List<Weapon> BlockedWeapons = new();
-
     private static readonly Dictionary<ulong, Vector3> TeleportCoords = new();
-
-
-    public static bool IsWeaponRestricted(Weapon weapon)
-    {
-        return BlockedWeapons.Contains(weapon);
-    }
 
 
     public static bool ProcessChat(string message, MyPlayer sender, GameServer<MyPlayer> server)
@@ -97,7 +90,25 @@ public static class AdminTools
             return false;
         }
 
-        Weapons.TryFind(weapon, out var wep);
+        if (weapon.StartsWith("#"))
+        {
+            var exists = Enum.TryParse(weapon.TrimStart('#'), true, out WeaponType wepType);
+            if (!exists)
+            {
+                server.MessageToPlayer(sender, "Invalid weapon type");
+                return false;
+            }
+
+            if (restrict.Value)
+                Restrictions.AddCategoryRestriction(wepType);
+            else
+                Restrictions.RemoveCategoryRestriction(wepType);
+
+            sender.Message($"{wepType.ToString()} restriction set to {restrict.Value}");
+            return false;
+        }
+
+        Weapons.TryFind(weapon.ToUpper(), out var wep);
 
         if (wep == null)
         {
@@ -106,10 +117,40 @@ public static class AdminTools
         }
 
         if (restrict.Value)
-            BlockedWeapons.Add(wep);
+            Restrictions.AddWeaponRestriction(wep);
         else
-            BlockedWeapons.Remove(wep);
+            Restrictions.RemoveWeaponRestriction(wep);
 
+        sender.Message($"{wep.Name} restriction set to {restrict.Value}");
+
+        return false;
+    }
+
+    private static bool GravityCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
+    {
+        if (args.Count() != 2)
+        {
+            server.MessageToPlayer(sender, "Invalid number of arguments for gravity command (<target> <multiplier>)");
+            return false;
+        }
+
+        var targets = FindTarget(args.GetString()!, sender, server).ToList();
+        var gravityMultiplier = args.GetFloat();
+        if (gravityMultiplier == null)
+        {
+            server.MessageToPlayer(sender, "Invalid gravity multiplier (pass a number)");
+            return false;
+        }
+
+        if (gravityMultiplier.Value is <= 0 or > 10)
+        {
+            server.MessageToPlayer(sender, "Invalid gravity multiplier (must be between 0 and 10)");
+            return false;
+        }
+
+        gravityMultiplier = 1 / gravityMultiplier.Value;
+
+        foreach (var t in targets) t.Modifications.JumpHeightMultiplier = gravityMultiplier.Value;
         return false;
     }
 
@@ -117,6 +158,27 @@ public static class AdminTools
     {
         var loc = sender.Position;
         TeleportCoords[sender.SteamID] = loc;
+        sender.Message("Location saved");
+        return false;
+    }
+
+    private static bool TeleportToCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
+    {
+        try
+        {
+            if (args.Count() < 1) sender.Message("Invalid number of arguments for teleport command (!teleto <target>)");
+            var targets = FindTarget(args.GetString()!, sender, server).ToList();
+            if (targets.Count != 1) sender.Message($"Invalid number of targets ({targets.Count})");
+
+            var target = targets.First();
+            sender.Teleport(target.Position);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            throw;
+        }
+
         return false;
     }
 
@@ -248,8 +310,6 @@ public static class AdminTools
 
     private static bool RconCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
     {
-        if (sender.SteamID != 76561197997290818) return false;
-
         if (args.Count() < 1)
         {
             server.MessageToPlayer(sender, "Invalid number of arguments for rcon command (<command>)");
@@ -423,9 +483,9 @@ public static class AdminTools
             return result;
         }
 
-        public float GetFloat()
+        public float? GetFloat()
         {
-            if (mIndex >= mArgs.Length) return 0;
+            if (mIndex >= mArgs.Length) return null;
             return float.Parse(mArgs[mIndex++]);
         }
 

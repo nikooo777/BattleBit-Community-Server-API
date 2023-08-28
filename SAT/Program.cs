@@ -1,13 +1,9 @@
 ﻿using BattleBitAPI;
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
-using CommunityServerAPI.Storage;
 using SAT.Models;
-using SAT.Storage;
 using SAT.SwissAdminTools;
 using Admin = SAT.SwissAdminTools.Admin;
-using BlockType = SAT.SwissAdminTools.BlockType;
-using ChatLog = SAT.Models.ChatLog;
 
 namespace SwissAdminTools;
 
@@ -35,21 +31,20 @@ public class MyGameServer : GameServer<MyPlayer>
 {
     public MyGameServer()
     {
-        const string connectionString = "server=localhost;user=battlebit;password=battlebit;database=battlebit";
         Db = new BattlebitContext();
-        Sat = new SwissAdminToolsMysql(connectionString);
     }
 
-    public static SwissAdminToolsStore Sat { get; set; }
     public static BattlebitContext Db { get; set; }
 
     public override async Task OnConnected()
     {
         ForceStartGame();
         RoundSettings.SecondsLeft = 3600;
-        RoundSettings.TeamATickets = 100;
-        RoundSettings.TeamBTickets = 100;
-        ServerSettings.PlayerCollision = true;
+        RoundSettings.TeamATickets = 666;
+        RoundSettings.TeamBTickets = 666;
+        RoundSettings.MaxTickets = 600;
+        ServerRulesText = "This is a test";
+        LoadingScreenText = "This server is ran by Elite-HunterZ.com \nYou can join our Discord at https://discord.elite-hunterz.com";
     }
 
     public override async Task OnPlayerConnected(MyPlayer player)
@@ -61,8 +56,7 @@ public class MyGameServer : GameServer<MyPlayer>
             return;
         }
 
-        player.Modifications.CanDeploy = true;
-        Console.WriteLine($"Player {player.Name} - {player.SteamID} connected with IP {player.IP}");
+        Console.WriteLine($"[{DateTime.UtcNow}] Player {player.Name} - {player.SteamID} connected with IP {player.IP}");
     }
 
     public override Task OnPlayerJoiningToServer(ulong steamId, PlayerJoiningArguments args)
@@ -157,8 +151,8 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override Task<bool> OnPlayerTypedMessage(MyPlayer player, ChatChannel channel, string msg)
     {
-        Sat.StoreChatLog(player.SteamID, msg);
-        var res = AdminTools.ProcessChat(msg, player, this);
+        ChatLogger.StoreChatLog(player.SteamID, msg);
+        var res = ChatProcessor.ProcessChat(msg, player, this);
         if (!res) return Task.FromResult(false);
 
         var blockResult = Blocks.IsBlocked(player.SteamID, BlockType.Gag);
@@ -169,52 +163,56 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override async Task<OnPlayerSpawnArguments?> OnPlayerSpawning(MyPlayer player, OnPlayerSpawnArguments request)
     {
-        if (AdminTools.IsWeaponRestricted(request.Loadout.PrimaryWeapon.Tool))
+        if (Restrictions.IsWeaponRestricted(request.Loadout.PrimaryWeapon.Tool))
         {
-            player.Modifications.CanDeploy = false;
             player.WarnPlayer($"You are not allowed to use {request.Loadout.PrimaryWeapon.Tool.Name}!");
+            return null;
         }
 
-        if (AdminTools.IsWeaponRestricted(request.Loadout.SecondaryWeapon.Tool))
+        if (Restrictions.IsWeaponRestricted(request.Loadout.SecondaryWeapon.Tool))
         {
-            player.Modifications.CanDeploy = false;
             player.WarnPlayer($"You are not allowed to use {request.Loadout.SecondaryWeapon.Tool.Name}!");
+            return null;
         }
-
-        //create a timer to reset the player's ability to deploy
-        if (player.Modifications.CanDeploy)
-            return request;
-
-        //set the player's ability to deploy to true
-        Timer t = null; // Declare the timer outside the callback for clarity
-
-        t = new Timer(state =>
-        {
-            player.Modifications.CanDeploy = true;
-            player.Kill();
-            t?.Dispose();
-        }, null, 2000, Timeout.Infinite);
 
         return request;
     }
 
     public override Task OnPlayerReported(MyPlayer from, MyPlayer to, ReportReason reason, string additional)
     {
-        var reporterID = Db.Players.FirstOrDefault(player => player.SteamId == (long)from.SteamID)?.Id;
-        var reportedPlayerID = Db.Players.FirstOrDefault(player => player.SteamId == (long)to.SteamID);
-        if (reporterID == null || reportedPlayerID == null) return Task.CompletedTask;
+        var reporterId = Db.Players.FirstOrDefault(player => player.SteamId == (long)from.SteamID)?.Id;
+        var reportedPlayerId = Db.Players.FirstOrDefault(player => player.SteamId == (long)to.SteamID);
+        if (reporterId == null || reportedPlayerId == null) return Task.CompletedTask;
 
         var report = new PlayerReport
         {
-            ReporterId = reporterID.Value,
+            ReporterId = reporterId.Value,
             Reason = reason + " " + additional,
             Status = "Pending",
             AdminNotes = null,
-            ReportedPlayer = reportedPlayerID
+            ReportedPlayer = reportedPlayerId
         };
         Db.PlayerReports.Add(report);
         Db.SaveChanges();
         return Task.CompletedTask;
+    }
+
+    public override async Task OnPlayerDisconnected(MyPlayer player)
+    {
+        Console.WriteLine($"[{DateTime.UtcNow}] Player {player.Name} - {player.SteamID} disconnected");
+    }
+
+    public override async Task OnRoundStarted()
+    {
+        RoundSettings.SecondsLeft *= 2;
+        RoundSettings.TeamATickets *= 2;
+        RoundSettings.TeamBTickets *= 2;
+        RoundSettings.MaxTickets = RoundSettings.TeamATickets;
+    }
+
+    public override async Task OnPlayerDied(MyPlayer player)
+    {
+        player.Modifications.RespawnTime = 5;
     }
 }
 
