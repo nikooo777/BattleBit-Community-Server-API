@@ -30,8 +30,8 @@ public static class ChatProcessor
         { "teleto", TeleportToCmd },
         { "restrict", RestrictCmd },
         { "rcon", RconCmd },
-        { "gravity", GravityCmd }
-        // { "speed", SpeedCmd },
+        { "gravity", GravityCmd },
+        { "speed", SpeedCmd }
         // { "", Cmd }
     };
 
@@ -123,6 +123,32 @@ public static class ChatProcessor
 
         sender.Message($"{wep.Name} restriction set to {restrict.Value}");
 
+        return false;
+    }
+
+    private static bool SpeedCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
+    {
+        if (args.Count() != 2)
+        {
+            server.MessageToPlayer(sender, "Invalid number of arguments for speed command (<target> <multiplier>)");
+            return false;
+        }
+
+        var targets = FindTarget(args.GetString()!, sender, server).ToList();
+        var speedMultiplier = args.GetFloat();
+        if (speedMultiplier == null)
+        {
+            server.MessageToPlayer(sender, "Invalid speed multiplier (pass a number)");
+            return false;
+        }
+
+        if (speedMultiplier.Value is < 0 or > 10)
+        {
+            server.MessageToPlayer(sender, "Invalid speed multiplier (must be between 0 and 10)");
+            return false;
+        }
+
+        foreach (var t in targets) t.Modifications.RunningSpeedMultiplier = speedMultiplier.Value;
         return false;
     }
 
