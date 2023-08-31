@@ -1,30 +1,75 @@
 CREATE DATABASE IF NOT EXISTS battlebit CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE TABLE IF NOT EXISTS player
+CREATE TABLE IF NOT EXISTS `player`
 (
-    id            INT AUTO_INCREMENT PRIMARY KEY,
-    steam_id      BIGINT UNIQUE NOT NULL,
-    is_banned     BOOLEAN       NOT NULL,
-    roles         INT,
-    achievements  BLOB,
-    selections    BLOB,
-    tool_progress BLOB,
-    created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
+    `id`            int                                     NOT NULL AUTO_INCREMENT,
+    `steam_id`      bigint                                  NOT NULL,
+    `name`          varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+    `is_banned`     tinyint(1)                              NOT NULL,
+    `roles`         int                                              DEFAULT NULL,
+    `achievements`  blob,
+    `selections`    blob,
+    `tool_progress` blob,
+    `created_at`    timestamp                               NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`    timestamp                               NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `steam_id` (`steam_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
 
-
-CREATE TABLE IF NOT EXISTS chat_logs
+CREATE TABLE IF NOT EXISTS `admins`
 (
-    id        INT AUTO_INCREMENT PRIMARY KEY,
-    message   TEXT COLLATE utf8mb4_unicode_ci NOT NULL,
-    player_id INT                             NOT NULL,
-    timestamp DATETIME                        NOT NULL,
-    FOREIGN KEY (player_id) REFERENCES player (id) ON DELETE CASCADE ON UPDATE CASCADE
-) CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
+    `id`       int                                     NOT NULL AUTO_INCREMENT,
+    `name`     varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+    `steam_id` bigint                                  NOT NULL,
+    `immunity` int                                     NOT NULL,
+    `flags`    varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `steam_id` (`steam_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
 
-CREATE TABLE `player_progress`
+CREATE TABLE IF NOT EXISTS `blocks`
+(
+    `id`              int                                                  NOT NULL AUTO_INCREMENT,
+    `steam_id`        bigint                                               NOT NULL,
+    `block_type`      enum ('BAN','GAG','MUTE') COLLATE utf8mb4_unicode_ci NOT NULL,
+    `reason`          varchar(255) COLLATE utf8mb4_unicode_ci              NOT NULL,
+    `expiry_date`     datetime                                             NOT NULL,
+    `issuer_admin_id` int                                                  NOT NULL,
+    `target_ip`       varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+    `admin_ip`        varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    KEY `issuer_admin_id` (`issuer_admin_id`),
+    CONSTRAINT `blocks_ibfk_1` FOREIGN KEY (`issuer_admin_id`) REFERENCES `admins` (`id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `chat_logs`
+(
+    `id`        int                                                   NOT NULL AUTO_INCREMENT,
+    `message`   text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    `player_id` int                                                   NOT NULL,
+    `timestamp` datetime                                              NOT NULL,
+    PRIMARY KEY (`id`),
+    KEY `player_id` (`player_id`),
+    CONSTRAINT `chat_logs_ibfk_1` FOREIGN KEY (`player_id`) REFERENCES `player` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `gorp_migrations`
+(
+    `id`         varchar(255) NOT NULL,
+    `applied_at` datetime DEFAULT NULL,
+    PRIMARY KEY (`id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb3;
+
+
+CREATE TABLE IF NOT EXISTS `player_progress`
 (
     `id`                   int       NOT NULL AUTO_INCREMENT,
     `player_id`            int                DEFAULT NULL,
@@ -79,38 +124,15 @@ CREATE TABLE `player_progress`
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS admins
-(
-    id       INT AUTO_INCREMENT PRIMARY KEY,
-    name     VARCHAR(255) NOT NULL,
-    steam_id BIGINT       NOT NULL UNIQUE,
-    immunity INT          NOT NULL,
-    flags    VARCHAR(255) NOT NULL
-) CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS blocks
+CREATE TABLE IF NOT EXISTS `player_reports`
 (
-    id              INT AUTO_INCREMENT PRIMARY KEY,
-    steam_id        BIGINT                      NOT NULL,
-    block_type      ENUM ('BAN', 'GAG', 'MUTE') NOT NULL,
-    reason          VARCHAR(255)                NOT NULL,
-    expiry_date     DATETIME                    NOT NULL,
-    issuer_admin_id INT                         NOT NULL,
-    target_ip       VARCHAR(45) DEFAULT NULL,
-    admin_ip        VARCHAR(45) DEFAULT NULL,
-    FOREIGN KEY (issuer_admin_id) REFERENCES admins (id)
-) CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-
-CREATE TABLE `player_reports`
-(
-    `id`                 int                                                                           NOT NULL AUTO_INCREMENT,
+    `id`                 int                                                                                                 NOT NULL AUTO_INCREMENT,
     `reporter_id`        int DEFAULT NULL,
-    `reported_player_id` int                                                                           NOT NULL,
-    `reason`             text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci                         NOT NULL,
-    `timestamp`          datetime                                                                      NOT NULL,
-    `status`             enum ('Pending','Reviewed','Resolved','Dismissed') COLLATE utf8mb4_unicode_ci NOT NULL,
+    `reported_player_id` int                                                                                                 NOT NULL,
+    `reason`             text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci                                               NOT NULL,
+    `timestamp`          datetime                                                                                            NOT NULL,
+    `status`             enum ('Pending','Reviewed','Resolved','Dismissed') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
     `admin_notes`        text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
     PRIMARY KEY (`id`),
     KEY `player_reports_ibfk_1` (`reporter_id`),
