@@ -16,8 +16,6 @@ internal class Program
         Console.WriteLine(ConfigurationManager.Config.join_text);
         const int port = 1337;
         var listener = new ServerListener<MyPlayer, MyGameServer>();
-        // listener.OnCreatingGameServerInstance += OnCreatingGameServerInstance;
-        // listener.OnCreatingPlayerInstance += OnCreatingPlayerInstance;
         listener.OnGameServerConnected += async server =>
         {
             Console.WriteLine($"Gameserver connected! {server.GameIP}:{server.GamePort} {server.ServerName}");
@@ -40,13 +38,22 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override async Task OnConnected()
     {
-        ForceStartGame();
-        RoundSettings.SecondsLeft = ConfigurationManager.Config.max_time;
-        RoundSettings.TeamATickets = ConfigurationManager.Config.max_tickets;
-        RoundSettings.TeamBTickets = ConfigurationManager.Config.max_tickets;
-        RoundSettings.MaxTickets = ConfigurationManager.Config.max_tickets;
-        ServerRulesText = "This is a test";
-        LoadingScreenText = ConfigurationManager.Config.join_text;
+        if (RoundSettings.State == GameState.WaitingForPlayers)
+        {
+            RoundSettings.PlayersToStart = 0;
+            RoundSettings.SecondsLeft = ConfigurationManager.Config.max_time;
+            RoundSettings.TeamATickets = ConfigurationManager.Config.max_tickets;
+            RoundSettings.TeamBTickets = ConfigurationManager.Config.max_tickets;
+            RoundSettings.MaxTickets = ConfigurationManager.Config.max_tickets;
+            ForceStartGame();
+        }
+
+        var ads = new Advertisements(this);
+        Task.Run(ads.Spam);
+
+        GamemodeRotation.SetRotation(ConfigurationManager.Config.rotations.gamemodes.ToArray());
+        SetRulesScreenText("This is a test");
+        SetLoadingScreenText(ConfigurationManager.Config.join_text);
         foreach (var rt in ConfigurationManager.Config.restrictions.weapon_types)
         {
             Console.WriteLine("Adding restriction for " + rt + "");
@@ -54,6 +61,12 @@ public class MyGameServer : GameServer<MyPlayer>
             if (exists)
                 Restrictions.AddCategoryRestriction(wepType);
         }
+
+        Task.Run(() =>
+        {
+            //warm up the admin cache
+            foreach (var p in AllPlayers) Admin.IsPlayerAdmin(p.SteamID);
+        });
     }
 
     public override async Task OnPlayerConnected(MyPlayer player)
@@ -67,6 +80,8 @@ public class MyGameServer : GameServer<MyPlayer>
                 existingPlayer.Name = player.Name;
                 Db.SaveChanges();
             }
+
+            player.Modifications.CanSpectate = existingPlayer!.Roles > (int)Roles.None;
         }
         catch (Exception ex)
         {
@@ -80,17 +95,18 @@ public class MyGameServer : GameServer<MyPlayer>
             return;
         }
 
+        SayToAllChat(Advertisements.GetWelcomeMessage(player.Name));
         Console.WriteLine($"[{DateTime.UtcNow}] Player {player.Name} - {player.SteamID} connected with IP {player.IP}");
     }
 
     public override Task OnGameStateChanged(GameState oldState, GameState newState)
     {
-        if (newState == GameState.WaitingForPlayers) ForceStartGame();
-        // RoundSettings.SecondsLeft = 3600;
-        // RoundSettings.TeamATickets = 666;
-        // RoundSettings.TeamBTickets = 666;
-        // RoundSettings.MaxTickets = 600;
-        // }
+        if (newState == GameState.WaitingForPlayers)
+        {
+            RoundSettings.PlayersToStart = 0;
+            ForceStartGame();
+        }
+
         if (newState == GameState.Playing)
         {
             RoundSettings.SecondsLeft = ConfigurationManager.Config.max_time;

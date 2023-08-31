@@ -8,6 +8,10 @@ public class Configuration
     public int max_tickets { get; set; }
     public int max_time { get; set; }
     public string join_text { get; set; }
+    public List<string> advertisements { get; set; }
+    public List<string> welcome_messages { get; set; }
+    public Rotations rotations { get; set; }
+
     public BattlebitDb battlebit_db { get; set; }
 }
 
@@ -16,6 +20,12 @@ public class Restrictions
     public List<string> weapons { get; set; }
     public List<string> weapon_types { get; set; }
     public List<string> classes { get; set; }
+}
+
+public class Rotations
+{
+    public List<string> maps { get; set; }
+    public List<string> gamemodes { get; set; }
 }
 
 public class BattlebitDb
