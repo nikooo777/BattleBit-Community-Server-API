@@ -1,10 +1,11 @@
 ﻿using BattleBitAPI;
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
-using CommunityServerAPI;
+using SAT.configs;
 using SAT.Models;
 using SAT.SwissAdminTools;
 using Admin = SAT.SwissAdminTools.Admin;
+using Restrictions = SAT.SwissAdminTools.Restrictions;
 
 namespace SwissAdminTools;
 
@@ -12,6 +13,7 @@ internal class Program
 {
     private static void Main(string[] args)
     {
+        Console.WriteLine(ConfigurationManager.Config.join_text);
         const int port = 1337;
         var listener = new ServerListener<MyPlayer, MyGameServer>();
         // listener.OnCreatingGameServerInstance += OnCreatingGameServerInstance;
@@ -22,7 +24,6 @@ internal class Program
             server.ServerSettings.PlayerCollision = true;
         };
         listener.Start(port);
-
         Console.WriteLine($"APIs Server started on port {port}");
         Thread.Sleep(-1);
     }
@@ -40,12 +41,19 @@ public class MyGameServer : GameServer<MyPlayer>
     public override async Task OnConnected()
     {
         ForceStartGame();
-        RoundSettings.SecondsLeft = 3600;
-        RoundSettings.TeamATickets = 666;
-        RoundSettings.TeamBTickets = 666;
-        RoundSettings.MaxTickets = 600;
+        RoundSettings.SecondsLeft = ConfigurationManager.Config.max_time;
+        RoundSettings.TeamATickets = ConfigurationManager.Config.max_tickets;
+        RoundSettings.TeamBTickets = ConfigurationManager.Config.max_tickets;
+        RoundSettings.MaxTickets = ConfigurationManager.Config.max_tickets;
         ServerRulesText = "This is a test";
-        LoadingScreenText = $"This server is ran by Elite-HunterZ.com \n{RichText.Size(RichText.Bold("You can join our Discord at https://discord.elite-hunterz.com"), 25)}";
+        LoadingScreenText = ConfigurationManager.Config.join_text;
+        foreach (var rt in ConfigurationManager.Config.restrictions.weapon_types)
+        {
+            Console.WriteLine("Adding restriction for " + rt + "");
+            var exists = Enum.TryParse(rt, true, out WeaponType wepType);
+            if (exists)
+                Restrictions.AddCategoryRestriction(wepType);
+        }
     }
 
     public override async Task OnPlayerConnected(MyPlayer player)
@@ -73,6 +81,17 @@ public class MyGameServer : GameServer<MyPlayer>
         }
 
         Console.WriteLine($"[{DateTime.UtcNow}] Player {player.Name} - {player.SteamID} connected with IP {player.IP}");
+    }
+
+    public override Task OnGameStateChanged(GameState oldState, GameState newState)
+    {
+        if (newState == GameState.WaitingForPlayers) ForceStartGame();
+        // RoundSettings.SecondsLeft = 3600;
+        // RoundSettings.TeamATickets = 666;
+        // RoundSettings.TeamBTickets = 666;
+        // RoundSettings.MaxTickets = 600;
+        // }
+        return Task.CompletedTask;
     }
 
     public override Task OnPlayerJoiningToServer(ulong steamId, PlayerJoiningArguments args)
@@ -207,7 +226,8 @@ public class MyGameServer : GameServer<MyPlayer>
             Reason = reason + " " + additional,
             Status = "Pending",
             AdminNotes = null,
-            ReportedPlayer = reportedPlayerId
+            ReportedPlayer = reportedPlayerId,
+            Timestamp = DateTime.Now
         };
         Db.PlayerReports.Add(report);
         Db.SaveChanges();

@@ -33,6 +33,7 @@ public class Restrictions
 
     public static void AddCategoryRestriction(WeaponType weaponType)
     {
+        Console.WriteLine("Adding category restriction for " + weaponType + "");
         using (BlockedCategories.GetWriteHandle())
         {
             BlockedCategories.Value.Add(weaponType, true);
