@@ -249,10 +249,10 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override async Task OnRoundStarted()
     {
-        RoundSettings.SecondsLeft *= 2;
-        RoundSettings.TeamATickets *= 2;
-        RoundSettings.TeamBTickets *= 2;
-        RoundSettings.MaxTickets = RoundSettings.TeamATickets;
+        // RoundSettings.SecondsLeft *= 2;
+        // RoundSettings.TeamATickets *= 2;
+        // RoundSettings.TeamBTickets *= 2;
+        // RoundSettings.MaxTickets = RoundSettings.TeamATickets;
     }
 
     public override async Task OnPlayerDied(MyPlayer player)
