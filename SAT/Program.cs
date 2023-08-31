@@ -91,6 +91,14 @@ public class MyGameServer : GameServer<MyPlayer>
         // RoundSettings.TeamBTickets = 666;
         // RoundSettings.MaxTickets = 600;
         // }
+        if (newState == GameState.Playing)
+        {
+            RoundSettings.SecondsLeft = ConfigurationManager.Config.max_time;
+            RoundSettings.TeamATickets = ConfigurationManager.Config.max_tickets;
+            RoundSettings.TeamBTickets = ConfigurationManager.Config.max_tickets;
+            RoundSettings.MaxTickets = ConfigurationManager.Config.max_tickets;
+        }
+
         return Task.CompletedTask;
     }
 
