@@ -1,0 +1,20 @@
+{
+  "restrictions": {
+    "weapons": [
+    ],
+    "weapon_types": [
+      "SniperRifle"
+    ],
+    "classes": [
+    ]
+  },
+  "max_tickets": 1500,
+  "max_time": 3600,
+  "join_text": "Welcome to the EliteHunterZ battlebit server!\nJoin us on discord: https://discord.elite-hunterz.com",
+  "battlebit_db": {
+    "user": "battlebit",
+    "password": "battlebit",
+    "database": "battlebit",
+    "host": "localhost"
+  }
+}

@@ -45,7 +45,7 @@ public class MyGameServer : GameServer<MyPlayer>
         RoundSettings.TeamBTickets = 666;
         RoundSettings.MaxTickets = 600;
         ServerRulesText = "This is a test";
-        LoadingScreenText = $"This server is ran by Elite-HunterZ.com \n{RichText.Size(RichText.Bold("You can join our Discord at https://discord.elite-hunterz.com"), 15)}";
+        LoadingScreenText = $"This server is ran by Elite-HunterZ.com \n{RichText.Size(RichText.Bold("You can join our Discord at https://discord.elite-hunterz.com"), 25)}";
     }
 
     public override async Task OnPlayerConnected(MyPlayer player)

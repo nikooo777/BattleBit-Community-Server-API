@@ -9,6 +9,8 @@ public partial class Player
 
     public long SteamId { get; set; }
 
+    public string Name { get; set; } = null!;
+
     public bool IsBanned { get; set; }
 
     public int? Roles { get; set; }

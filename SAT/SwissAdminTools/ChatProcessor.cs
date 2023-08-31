@@ -31,6 +31,7 @@ public static class ChatProcessor
         { "restrict", RestrictCmd },
         { "rcon", RconCmd },
         { "gravity", GravityCmd },
+        { "freeze", FreezeCmd },
         { "speed", SpeedCmd }
         // { "", Cmd }
     };
@@ -123,6 +124,23 @@ public static class ChatProcessor
 
         sender.Message($"{wep.Name} restriction set to {restrict.Value}");
 
+        return false;
+    }
+
+    private static bool FreezeCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
+    {
+        if (args.Count() != 1)
+        {
+            server.MessageToPlayer(sender, "Invalid number of arguments for freeze command (<target>)");
+            return false;
+        }
+
+        var targets = FindTarget(args.GetString()!, sender, server).ToList();
+        targets.ForEach(t =>
+        {
+            t.Modifications.Freeze = !t.Modifications.Freeze;
+            server.UILogOnServer($"{t.Name} was {(t.Modifications.Freeze ? "frozen" : "unfrozen")}", 3f);
+        });
         return false;
     }
 

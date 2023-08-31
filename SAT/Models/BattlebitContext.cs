@@ -128,6 +128,9 @@ public partial class BattlebitContext : DbContext
                 .HasColumnType("timestamp")
                 .HasColumnName("created_at");
             entity.Property(e => e.IsBanned).HasColumnName("is_banned");
+            entity.Property(e => e.Name)
+                .HasMaxLength(255)
+                .HasColumnName("name");
             entity.Property(e => e.Roles).HasColumnName("roles");
             entity.Property(e => e.Selections)
                 .HasColumnType("blob")
