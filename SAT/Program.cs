@@ -50,6 +50,21 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override async Task OnPlayerConnected(MyPlayer player)
     {
+        try
+        {
+            var existingPlayer = Db.Players.FirstOrDefault(p => (long)player.SteamID == p.SteamId);
+            if (existingPlayer != null)
+            {
+                // Update player
+                existingPlayer.Name = player.Name;
+                Db.SaveChanges();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error while updating player: {ex.Message}");
+        }
+
         var blockDetails = Blocks.IsBlocked(player.SteamID, BlockType.Ban);
         if (blockDetails.isBlocked)
         {
@@ -83,6 +98,7 @@ public class MyGameServer : GameServer<MyPlayer>
             {
                 SteamId = (long)steamId,
                 IsBanned = args.Stats.IsBanned,
+                Name = "Joining...",
                 Roles = (int)args.Stats.Roles,
                 Achievements = args.Stats.Achievements,
                 Selections = args.Stats.Selections,
