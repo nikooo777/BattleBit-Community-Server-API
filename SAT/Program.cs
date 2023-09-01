@@ -3,6 +3,7 @@ using BattleBitAPI.Common;
 using BattleBitAPI.Server;
 using SAT.configs;
 using SAT.Models;
+using SAT.rank;
 using SAT.SwissAdminTools;
 using Admin = SAT.SwissAdminTools.Admin;
 using Restrictions = SAT.SwissAdminTools.Restrictions;
@@ -38,6 +39,8 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override async Task OnConnected()
     {
+        var ads = new Advertisements(this);
+        Task.Run(ads.Spam);
         if (RoundSettings.State == GameState.WaitingForPlayers)
         {
             RoundSettings.PlayersToStart = 0;
@@ -47,9 +50,6 @@ public class MyGameServer : GameServer<MyPlayer>
             RoundSettings.MaxTickets = ConfigurationManager.Config.max_tickets;
             ForceStartGame();
         }
-
-        var ads = new Advertisements(this);
-        Task.Run(ads.Spam);
 
         GamemodeRotation.SetRotation(ConfigurationManager.Config.rotations.gamemodes.ToArray());
         SetRulesScreenText("This is a test");
@@ -118,12 +118,32 @@ public class MyGameServer : GameServer<MyPlayer>
         return Task.CompletedTask;
     }
 
+    public override async Task OnSavePlayerStats(ulong steamID, PlayerStats stats)
+    {
+        var previousStats = Cache.Get(steamID);
+        if (previousStats == null) return;
+        var delta = Utils.Delta(stats.Progress, previousStats);
+        var dbProgress = Db.PlayerProgresses
+            .FirstOrDefault(playerProgress => playerProgress.Player.SteamId == (long)steamID && playerProgress.IsOfficial == 0);
+        if (dbProgress == null)
+            dbProgress = new PlayerProgress
+            {
+                PlayerId = Db.Players.First(player => player.SteamId == (long)steamID).Id,
+                IsOfficial = 0
+            };
+        dbProgress = Utils.AddProgress(delta, dbProgress);
+        Db.PlayerProgresses.Update(dbProgress);
+        Db.SaveChanges();
+    }
+
     public override Task OnPlayerJoiningToServer(ulong steamId, PlayerJoiningArguments args)
     {
         try
         {
             var isAdmin = Admin.IsPlayerAdmin(steamId);
             if (isAdmin) args.Stats.Roles = Roles.Admin;
+
+
             var existingPlayer = Db.Players.FirstOrDefault(player => (long)steamId == player.SteamId);
             if (existingPlayer != null)
             {
@@ -133,10 +153,24 @@ public class MyGameServer : GameServer<MyPlayer>
                 existingPlayer.Achievements = args.Stats.Achievements;
                 existingPlayer.Selections = args.Stats.Selections;
                 existingPlayer.ToolProgress = args.Stats.ToolProgress;
+
+                // Update player progress
+                var existingDbProgress = Db.PlayerProgresses
+                    .First(playerProgress => playerProgress.PlayerId == existingPlayer.Id && playerProgress.IsOfficial == 1);
+                var existingOwnDbProgress = Db.PlayerProgresses
+                    .First(playerProgress => playerProgress.PlayerId == existingPlayer.Id && playerProgress.IsOfficial == 0);
+
+                var gameProgress = Utils.ProgressFrom(existingDbProgress);
+                var delta = Utils.Delta(args.Stats.Progress, gameProgress);
+                existingDbProgress = Utils.AddProgress(delta, existingDbProgress);
+                Db.PlayerProgresses.Update(existingDbProgress);
                 Db.SaveChanges();
-                return Task.CompletedTask;
+                args.Stats.Progress = Utils.Add(args.Stats.Progress, Utils.ProgressFrom(existingOwnDbProgress));
+                Cache.Set(steamId, args.Stats.Progress);
+                return Task.FromResult(args);
             }
 
+            Cache.Set(steamId, args.Stats.Progress);
             var newPlayer = Db.Players.Add(new Player
             {
                 SteamId = (long)steamId,
@@ -149,56 +183,13 @@ public class MyGameServer : GameServer<MyPlayer>
                 CreatedAt = default,
                 UpdatedAt = default,
                 ChatLogs = new List<ChatLog>(),
-                PlayerProgress = new PlayerProgress
-                {
-                    KillCount = args.Stats.Progress.KillCount,
-                    DeathCount = args.Stats.Progress.DeathCount,
-                    LeaderKills = args.Stats.Progress.LeaderKills,
-                    AssaultKills = args.Stats.Progress.AssaultKills,
-                    MedicKills = args.Stats.Progress.MedicKills,
-                    EngineerKills = args.Stats.Progress.EngineerKills,
-                    SupportKills = args.Stats.Progress.SupportKills,
-                    ReconKills = args.Stats.Progress.ReconKills,
-                    WinCount = args.Stats.Progress.WinCount,
-                    LoseCount = args.Stats.Progress.LoseCount,
-                    FriendlyShots = args.Stats.Progress.FriendlyShots,
-                    FriendlyKills = args.Stats.Progress.FriendlyKills,
-                    Revived = args.Stats.Progress.Revived,
-                    RevivedTeamMates = args.Stats.Progress.RevivedTeamMates,
-                    Assists = args.Stats.Progress.Assists,
-                    Prestige = args.Stats.Progress.Prestige,
-                    CurrentRank = args.Stats.Progress.Rank,
-                    Exp = args.Stats.Progress.EXP,
-                    ShotsFired = args.Stats.Progress.ShotsFired,
-                    ShotsHit = args.Stats.Progress.ShotsHit,
-                    Headshots = args.Stats.Progress.Headshots,
-                    CompletedObjectives = args.Stats.Progress.ObjectivesComplated,
-                    HealedHps = args.Stats.Progress.HealedHPs,
-                    RoadKills = args.Stats.Progress.RoadKills,
-                    Suicides = args.Stats.Progress.Suicides,
-                    VehiclesDestroyed = args.Stats.Progress.VehiclesDestroyed,
-                    VehicleHpRepaired = args.Stats.Progress.VehicleHPRepaired,
-                    LongestKill = args.Stats.Progress.LongestKill,
-                    PlayTimeSeconds = args.Stats.Progress.PlayTimeSeconds,
-                    LeaderPlayTime = args.Stats.Progress.LeaderPlayTime,
-                    AssaultPlayTime = args.Stats.Progress.AssaultPlayTime,
-                    MedicPlayTime = args.Stats.Progress.MedicPlayTime,
-                    EngineerPlayTime = args.Stats.Progress.EngineerPlayTime,
-                    SupportPlayTime = args.Stats.Progress.SupportPlayTime,
-                    ReconPlayTime = args.Stats.Progress.ReconPlayTime,
-                    LeaderScore = args.Stats.Progress.LeaderScore,
-                    AssaultScore = args.Stats.Progress.AssaultScore,
-                    MedicScore = args.Stats.Progress.MedicScore,
-                    EngineerScore = args.Stats.Progress.EngineerScore,
-                    SupportScore = args.Stats.Progress.SupportScore,
-                    ReconScore = args.Stats.Progress.ReconScore,
-                    TotalScore = args.Stats.Progress.TotalScore,
-                    CreatedAt = default,
-                    UpdatedAt = default
-                },
+                PlayerProgresses = new List<PlayerProgress>(),
                 PlayerReportReportedPlayers = new List<PlayerReport>(),
                 PlayerReportReporters = new List<PlayerReport>()
             });
+            var dbProgress = Utils.SetProgress(args.Stats.Progress, new PlayerProgress { IsOfficial = 1 });
+            newPlayer.Entity.PlayerProgresses.Add(dbProgress);
+
             Db.SaveChanges();
         }
         catch (Exception ex)
@@ -263,12 +254,22 @@ public class MyGameServer : GameServer<MyPlayer>
         Console.WriteLine($"[{DateTime.UtcNow}] Player {player.Name} - {player.SteamID} disconnected");
     }
 
-    public override async Task OnRoundStarted()
+    public override async Task OnAPlayerDownedAnotherPlayer(OnPlayerKillArguments<MyPlayer> args)
     {
-        // RoundSettings.SecondsLeft *= 2;
-        // RoundSettings.TeamATickets *= 2;
-        // RoundSettings.TeamBTickets *= 2;
-        // RoundSettings.MaxTickets = RoundSettings.TeamATickets;
+        var isSuicide = args.Killer.SteamID == args.Victim.SteamID;
+        if (isSuicide)
+        {
+            Rank.AddSuicide(args.Killer.SteamID);
+            return;
+        }
+
+        Rank.AddKill(args.Killer.SteamID);
+        Rank.AddDeath(args.Victim.SteamID);
+    }
+
+    public override async Task OnAPlayerRevivedAnotherPlayer(MyPlayer from, MyPlayer to)
+    {
+        Rank.AddRevive(from.SteamID);
     }
 
     public override async Task OnPlayerDied(MyPlayer player)

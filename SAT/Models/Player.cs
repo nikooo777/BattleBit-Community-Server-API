@@ -27,9 +27,11 @@ public partial class Player
 
     public virtual ICollection<ChatLog> ChatLogs { get; set; } = new List<ChatLog>();
 
-    public virtual PlayerProgress? PlayerProgress { get; set; }
+    public virtual ICollection<PlayerProgress> PlayerProgresses { get; set; } = new List<PlayerProgress>();
 
     public virtual ICollection<PlayerReport> PlayerReportReportedPlayers { get; set; } = new List<PlayerReport>();
 
     public virtual ICollection<PlayerReport> PlayerReportReporters { get; set; } = new List<PlayerReport>();
+
+    public virtual ICollection<Suggestion> Suggestions { get; set; } = new List<Suggestion>();
 }

@@ -15,17 +15,22 @@ public partial class BattlebitContext : DbContext
     {
     }
 
+    public virtual DbSet<RankResponse> RankResponses { get; set; }
     public virtual DbSet<Admin> Admins { get; set; }
 
     public virtual DbSet<Block> Blocks { get; set; }
 
     public virtual DbSet<ChatLog> ChatLogs { get; set; }
 
+    public virtual DbSet<GorpMigration> GorpMigrations { get; set; }
+
     public virtual DbSet<Player> Players { get; set; }
 
     public virtual DbSet<PlayerProgress> PlayerProgresses { get; set; }
 
     public virtual DbSet<PlayerReport> PlayerReports { get; set; }
+
+    public virtual DbSet<Suggestion> Suggestions { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
@@ -111,6 +116,21 @@ public partial class BattlebitContext : DbContext
                 .HasConstraintName("chat_logs_ibfk_1");
         });
 
+        modelBuilder.Entity<GorpMigration>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("gorp_migrations")
+                .HasCharSet("utf8mb3")
+                .UseCollation("utf8mb3_general_ci");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.AppliedAt)
+                .HasColumnType("datetime")
+                .HasColumnName("applied_at");
+        });
+
         modelBuilder.Entity<Player>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
@@ -152,149 +172,67 @@ public partial class BattlebitContext : DbContext
 
             entity.ToTable("player_progress");
 
-            entity.HasIndex(e => e.PlayerId, "player_progress_player_uniq").IsUnique();
+            entity.HasIndex(e => new { e.PlayerId, e.IsOfficial }, "player_progress_player_uniq").IsUnique();
 
             entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.AssaultKills)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("assault_kills");
-            entity.Property(e => e.AssaultPlayTime)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("assault_play_time");
-            entity.Property(e => e.AssaultScore)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("assault_score");
-            entity.Property(e => e.Assists)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("assists");
-            entity.Property(e => e.CompletedObjectives)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("completed_objectives");
+            entity.Property(e => e.AssaultKills).HasColumnName("assault_kills");
+            entity.Property(e => e.AssaultPlayTime).HasColumnName("assault_play_time");
+            entity.Property(e => e.AssaultScore).HasColumnName("assault_score");
+            entity.Property(e => e.Assists).HasColumnName("assists");
+            entity.Property(e => e.CompletedObjectives).HasColumnName("completed_objectives");
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("timestamp")
                 .HasColumnName("created_at");
-            entity.Property(e => e.CurrentRank)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("current_rank");
-            entity.Property(e => e.DeathCount)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("death_count");
-            entity.Property(e => e.EngineerKills)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("engineer_kills");
-            entity.Property(e => e.EngineerPlayTime)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("engineer_play_time");
-            entity.Property(e => e.EngineerScore)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("engineer_score");
-            entity.Property(e => e.Exp)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("exp");
-            entity.Property(e => e.FriendlyKills)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("friendly_kills");
-            entity.Property(e => e.FriendlyShots)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("friendly_shots");
-            entity.Property(e => e.Headshots)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("headshots");
-            entity.Property(e => e.HealedHps)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("healed_hps");
-            entity.Property(e => e.KillCount)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("kill_count");
-            entity.Property(e => e.LeaderKills)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("leader_kills");
-            entity.Property(e => e.LeaderPlayTime)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("leader_play_time");
-            entity.Property(e => e.LeaderScore)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("leader_score");
-            entity.Property(e => e.LongestKill)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("longest_kill");
-            entity.Property(e => e.LoseCount)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("lose_count");
-            entity.Property(e => e.MedicKills)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("medic_kills");
-            entity.Property(e => e.MedicPlayTime)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("medic_play_time");
-            entity.Property(e => e.MedicScore)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("medic_score");
-            entity.Property(e => e.PlayTimeSeconds)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("play_time_seconds");
+            entity.Property(e => e.CurrentRank).HasColumnName("current_rank");
+            entity.Property(e => e.DeathCount).HasColumnName("death_count");
+            entity.Property(e => e.EngineerKills).HasColumnName("engineer_kills");
+            entity.Property(e => e.EngineerPlayTime).HasColumnName("engineer_play_time");
+            entity.Property(e => e.EngineerScore).HasColumnName("engineer_score");
+            entity.Property(e => e.Exp).HasColumnName("exp");
+            entity.Property(e => e.FriendlyKills).HasColumnName("friendly_kills");
+            entity.Property(e => e.FriendlyShots).HasColumnName("friendly_shots");
+            entity.Property(e => e.Headshots).HasColumnName("headshots");
+            entity.Property(e => e.HealedHps).HasColumnName("healed_hps");
+            entity.Property(e => e.IsOfficial)
+                .HasComment("when 1 it means the stats are from the official game, when 0 it's from our own servers")
+                .HasColumnName("is_official");
+            entity.Property(e => e.KillCount).HasColumnName("kill_count");
+            entity.Property(e => e.LeaderKills).HasColumnName("leader_kills");
+            entity.Property(e => e.LeaderPlayTime).HasColumnName("leader_play_time");
+            entity.Property(e => e.LeaderScore).HasColumnName("leader_score");
+            entity.Property(e => e.LongestKill).HasColumnName("longest_kill");
+            entity.Property(e => e.LoseCount).HasColumnName("lose_count");
+            entity.Property(e => e.MedicKills).HasColumnName("medic_kills");
+            entity.Property(e => e.MedicPlayTime).HasColumnName("medic_play_time");
+            entity.Property(e => e.MedicScore).HasColumnName("medic_score");
+            entity.Property(e => e.PlayTimeSeconds).HasColumnName("play_time_seconds");
             entity.Property(e => e.PlayerId).HasColumnName("player_id");
-            entity.Property(e => e.Prestige)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("prestige");
-            entity.Property(e => e.ReconKills)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("recon_kills");
-            entity.Property(e => e.ReconPlayTime)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("recon_play_time");
-            entity.Property(e => e.ReconScore)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("recon_score");
-            entity.Property(e => e.Revived)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("revived");
-            entity.Property(e => e.RevivedTeamMates)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("revived_team_mates");
-            entity.Property(e => e.RoadKills)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("road_kills");
-            entity.Property(e => e.ShotsFired)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("shots_fired");
-            entity.Property(e => e.ShotsHit)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("shots_hit");
-            entity.Property(e => e.Suicides)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("suicides");
-            entity.Property(e => e.SupportKills)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("support_kills");
-            entity.Property(e => e.SupportPlayTime)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("support_play_time");
-            entity.Property(e => e.SupportScore)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("support_score");
-            entity.Property(e => e.TotalScore)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("total_score");
+            entity.Property(e => e.Prestige).HasColumnName("prestige");
+            entity.Property(e => e.ReconKills).HasColumnName("recon_kills");
+            entity.Property(e => e.ReconPlayTime).HasColumnName("recon_play_time");
+            entity.Property(e => e.ReconScore).HasColumnName("recon_score");
+            entity.Property(e => e.Revived).HasColumnName("revived");
+            entity.Property(e => e.RevivedTeamMates).HasColumnName("revived_team_mates");
+            entity.Property(e => e.RoadKills).HasColumnName("road_kills");
+            entity.Property(e => e.ShotsFired).HasColumnName("shots_fired");
+            entity.Property(e => e.ShotsHit).HasColumnName("shots_hit");
+            entity.Property(e => e.Suicides).HasColumnName("suicides");
+            entity.Property(e => e.SupportKills).HasColumnName("support_kills");
+            entity.Property(e => e.SupportPlayTime).HasColumnName("support_play_time");
+            entity.Property(e => e.SupportScore).HasColumnName("support_score");
+            entity.Property(e => e.TotalScore).HasColumnName("total_score");
             entity.Property(e => e.UpdatedAt)
                 .ValueGeneratedOnAddOrUpdate()
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("timestamp")
                 .HasColumnName("updated_at");
-            entity.Property(e => e.VehicleHpRepaired)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("vehicle_hp_repaired");
-            entity.Property(e => e.VehiclesDestroyed)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("vehicles_destroyed");
-            entity.Property(e => e.WinCount)
-                .HasDefaultValueSql("'0'")
-                .HasColumnName("win_count");
+            entity.Property(e => e.VehicleHpRepaired).HasColumnName("vehicle_hp_repaired");
+            entity.Property(e => e.VehiclesDestroyed).HasColumnName("vehicles_destroyed");
+            entity.Property(e => e.WinCount).HasColumnName("win_count");
 
-            entity.HasOne(d => d.Player).WithOne(p => p.PlayerProgress)
-                .HasForeignKey<PlayerProgress>(d => d.PlayerId)
-                .OnDelete(DeleteBehavior.Cascade)
+            entity.HasOne(d => d.Player).WithMany(p => p.PlayerProgresses)
+                .HasForeignKey(d => d.PlayerId)
                 .HasConstraintName("player_progress_ibfk_1");
         });
 
@@ -332,6 +270,35 @@ public partial class BattlebitContext : DbContext
                 .HasForeignKey(d => d.ReporterId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("player_reports_ibfk_1");
+        });
+
+        modelBuilder.Entity<Suggestion>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity.ToTable("suggestions");
+
+            entity.HasIndex(e => e.PlayerId, "player_id");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp")
+                .HasColumnName("created_at");
+            entity.Property(e => e.Feedback)
+                .HasColumnType("text")
+                .HasColumnName("feedback");
+            entity.Property(e => e.PlayerId).HasColumnName("player_id");
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp")
+                .HasColumnName("updated_at");
+
+            entity.HasOne(d => d.Player).WithMany(p => p.Suggestions)
+                .HasForeignKey(d => d.PlayerId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("suggestions_ibfk_1");
         });
 
         OnModelCreatingPartial(modelBuilder);

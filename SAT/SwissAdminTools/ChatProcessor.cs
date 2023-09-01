@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
 using CommunityServerAPI;
+using Microsoft.EntityFrameworkCore;
 using SAT.Utils;
 using SwissAdminTools;
 
@@ -32,6 +33,7 @@ public static class ChatProcessor
         { "rcon", RconCmd },
         { "gravity", GravityCmd },
         { "freeze", FreezeCmd },
+        { "rank", RankCmd },
         { "speed", SpeedCmd }
         // { "", Cmd }
     };
@@ -42,6 +44,8 @@ public static class ChatProcessor
 
     public static bool ProcessChat(string message, MyPlayer sender, GameServer<MyPlayer> server)
     {
+        //super ghetto fix for now
+        if (message == "!rank") return RankCmd(new Arguments(""), sender, server, new Models.Admin());
         // this should be adjusted to be more flexible and precise
         var issuerAdmin = Admin.GetAdmin(sender.SteamID);
         if ((message.StartsWith("@") || message.StartsWith("!")) && issuerAdmin == null)
@@ -72,6 +76,29 @@ public static class ChatProcessor
             Console.WriteLine($"Error: {ex.Message}");
             return false;
         }
+    }
+
+    private static bool RankCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
+    {
+        var playerId = MyGameServer.Db.Players.FirstOrDefault(p => p.SteamId == (long)sender.SteamID)?.Id;
+        var rawSql = $@"SELECT player_id, `rank`
+FROM (
+    SELECT player_id, total_score,
+           ROW_NUMBER() OVER (ORDER BY total_score DESC) AS `rank`
+    FROM player_progress
+    WHERE is_official = 0
+) AS ranked
+WHERE player_id = {playerId};";
+
+        var rank = MyGameServer.Db.RankResponses.FromSqlRaw(rawSql).ToList();
+        if (rank.Count == 0)
+        {
+            sender.Message("You don't have a rank yet, wait until next round!");
+            return true;
+        }
+
+        server.MessageToPlayer(sender, $"Your rank is {rank.First().rank}");
+        return true;
     }
 
     private static bool RestrictCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)

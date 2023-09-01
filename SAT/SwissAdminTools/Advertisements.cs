@@ -10,6 +10,7 @@ public class Advertisements
     private static readonly string[] WelcomeMessages = ConfigurationManager.Config.welcome_messages.ToArray();
     private readonly string[] mAds;
     private readonly GameServer<MyPlayer> mServer;
+    private bool mAlreadyRunning;
     private int mIndex;
 
     public Advertisements(MyGameServer server)
@@ -21,6 +22,8 @@ public class Advertisements
 
     public void Spam()
     {
+        if (mAlreadyRunning) return;
+        mAlreadyRunning = true;
         while (true)
         {
             mServer.SayToAllChat(mAds[mIndex++ % mAds.Length]);
