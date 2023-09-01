@@ -125,14 +125,22 @@ public class MyGameServer : GameServer<MyPlayer>
         var delta = Utils.Delta(stats.Progress, previousStats);
         var dbProgress = Db.PlayerProgresses
             .FirstOrDefault(playerProgress => playerProgress.Player.SteamId == (long)steamID && playerProgress.IsOfficial == 0);
-        if (dbProgress == null)
+        if (dbProgress != null)
+        {
+            dbProgress = Utils.AddProgress(delta, dbProgress);
+            Db.PlayerProgresses.Update(dbProgress);
+        }
+        else
+        {
             dbProgress = new PlayerProgress
             {
                 PlayerId = Db.Players.First(player => player.SteamId == (long)steamID).Id,
                 IsOfficial = 0
             };
-        dbProgress = Utils.AddProgress(delta, dbProgress);
-        Db.PlayerProgresses.Update(dbProgress);
+            dbProgress = Utils.AddProgress(delta, dbProgress);
+            Db.PlayerProgresses.Add(dbProgress);
+        }
+
         Db.SaveChanges();
     }
 
@@ -158,14 +166,15 @@ public class MyGameServer : GameServer<MyPlayer>
                 var existingDbProgress = Db.PlayerProgresses
                     .First(playerProgress => playerProgress.PlayerId == existingPlayer.Id && playerProgress.IsOfficial == 1);
                 var existingOwnDbProgress = Db.PlayerProgresses
-                    .First(playerProgress => playerProgress.PlayerId == existingPlayer.Id && playerProgress.IsOfficial == 0);
+                    .FirstOrDefault(playerProgress => playerProgress.PlayerId == existingPlayer.Id && playerProgress.IsOfficial == 0);
 
                 var gameProgress = Utils.ProgressFrom(existingDbProgress);
                 var delta = Utils.Delta(args.Stats.Progress, gameProgress);
                 existingDbProgress = Utils.AddProgress(delta, existingDbProgress);
                 Db.PlayerProgresses.Update(existingDbProgress);
                 Db.SaveChanges();
-                args.Stats.Progress = Utils.Add(args.Stats.Progress, Utils.ProgressFrom(existingOwnDbProgress));
+                if (existingOwnDbProgress != null) args.Stats.Progress = Utils.Add(args.Stats.Progress, Utils.ProgressFrom(existingOwnDbProgress));
+
                 Cache.Set(steamId, args.Stats.Progress);
                 return Task.FromResult(args);
             }
