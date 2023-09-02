@@ -5,6 +5,7 @@ using SAT.configs;
 using SAT.Models;
 using SAT.rank;
 using SAT.SwissAdminTools;
+using SAT.Utils;
 using Admin = SAT.SwissAdminTools.Admin;
 using Restrictions = SAT.SwissAdminTools.Restrictions;
 
@@ -53,7 +54,7 @@ public class MyGameServer : GameServer<MyPlayer>
 
         GamemodeRotation.SetRotation(ConfigurationManager.Config.rotations.gamemodes.ToArray());
         SetRulesScreenText("This is a test");
-        SetLoadingScreenText(ConfigurationManager.Config.join_text);
+        Formatting.SafeSetLoadingScreenText(ConfigurationManager.Config.join_text + "\n" + Stats.TopN(3), this);
         foreach (var rt in ConfigurationManager.Config.restrictions.weapon_types)
         {
             Console.WriteLine("Adding restriction for " + rt + "");

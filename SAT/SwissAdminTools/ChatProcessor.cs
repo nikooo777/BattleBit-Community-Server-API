@@ -1,9 +1,11 @@
 using System.Numerics;
+using System.Text;
 using System.Text.RegularExpressions;
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
 using CommunityServerAPI;
-using Microsoft.EntityFrameworkCore;
+using SAT.Models;
+using SAT.rank;
 using SAT.Utils;
 using SwissAdminTools;
 
@@ -18,7 +20,7 @@ public enum BlockType
 
 public static class ChatProcessor
 {
-    private static readonly Dictionary<string, Func<Arguments, MyPlayer, GameServer<MyPlayer>, Models.Admin, bool>> Commands = new()
+    private static readonly Dictionary<string, Func<Arguments, MyPlayer, GameServer<MyPlayer>, Models.Admin, bool>> AdminCommands = new()
     {
         { "say", SayCmd },
         { "clear", ClearCmd },
@@ -33,30 +35,60 @@ public static class ChatProcessor
         { "rcon", RconCmd },
         { "gravity", GravityCmd },
         { "freeze", FreezeCmd },
-        { "rank", RankCmd },
+        { "extend", ExtendCmd },
         { "speed", SpeedCmd }
         // { "", Cmd }
+    };
+
+    private static readonly Dictionary<string, Func<Arguments, MyPlayer, GameServer<MyPlayer>, bool>> PublicCommands = new()
+    {
+        // { "", Cmd },
+        { "rtv", RtvCmd },
+        { "feedback", FeedbackCmd },
+        { "rank", RankCmd },
+        { "top", Top5Cmd }
     };
 
 
     private static readonly Dictionary<ulong, Vector3> TeleportCoords = new();
 
+    private static readonly Dictionary<ulong, DateTime> VotedRtv = new();
+    private static int RtvVotes;
+
+    private static DateTime RtvStartTime = DateTime.UtcNow;
+
 
     public static bool ProcessChat(string message, MyPlayer sender, GameServer<MyPlayer> server)
     {
-        //super ghetto fix for now
-        if (message == "!rank") return RankCmd(new Arguments(""), sender, server, new Models.Admin());
-        // this should be adjusted to be more flexible and precise
+        // if (message == "!rank") return RankCmd(new Arguments(""), sender, server);
+
+        if (message.StartsWith("@"))
+            message = Formatting.ReplaceFirst(message, "@", "!say ");
+
+        if (!message.StartsWith("!"))
+        {
+            var parts = message.Split(' ');
+            if (parts.Length == 0) return true;
+            var publicCommand = parts[0];
+            if (!PublicCommands.ContainsKey(publicCommand)) return true;
+            var publicArgs = parts.Length == 1 ? new Arguments("") : new Arguments(string.Join(" ", parts[1..]));
+            try
+            {
+                return PublicCommands[publicCommand](publicArgs, sender, server);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+                return false;
+            }
+        }
+
         var issuerAdmin = Admin.GetAdmin(sender.SteamID);
-        if ((message.StartsWith("@") || message.StartsWith("!")) && issuerAdmin == null)
+        if (message.StartsWith("!") && issuerAdmin == null)
         {
             sender.Message("You don't have enough permissions to use this command");
             return true;
         }
-
-
-        if (message.StartsWith("@")) return SayCmd(new Arguments(message.TrimStart('@')), sender, server, issuerAdmin!);
-        if (!message.StartsWith("!")) return true;
 
         message = message.TrimStart('!');
         var split = message.Split(new[] { ' ' }, 2);
@@ -64,12 +96,12 @@ public static class ChatProcessor
         if (split.Length == 0) return true;
 
         var command = split[0];
-        if (!Commands.ContainsKey(command)) return true;
+        if (!AdminCommands.ContainsKey(command)) return true;
 
         var args = split.Length == 1 ? new Arguments("") : new Arguments(split[1]);
         try
         {
-            return Commands[command](args, sender, server, issuerAdmin!);
+            return AdminCommands[command](args, sender, server, issuerAdmin!);
         }
         catch (Exception ex)
         {
@@ -78,26 +110,129 @@ public static class ChatProcessor
         }
     }
 
-    private static bool RankCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
+    private static bool ExtendCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server, Models.Admin issuerAdmin)
     {
-        var playerId = MyGameServer.Db.Players.FirstOrDefault(p => p.SteamId == (long)sender.SteamID)?.Id;
-        var rawSql = $@"SELECT player_id, `rank`
-FROM (
-    SELECT player_id, total_score,
-           ROW_NUMBER() OVER (ORDER BY total_score DESC) AS `rank`
-    FROM player_progress
-    WHERE is_official = 0
-) AS ranked
-WHERE player_id = {playerId};";
-
-        var rank = MyGameServer.Db.RankResponses.FromSqlRaw(rawSql).ToList();
-        if (rank.Count == 0)
+        if (args.Count() != 1)
         {
-            sender.Message("You don't have a rank yet, wait until next round!");
+            server.MessageToPlayer(sender, "Invalid number of arguments for extend command (<seconds>)");
+            return false;
+        }
+
+        var seconds = args.GetInt();
+        switch (seconds)
+        {
+            case null:
+                server.MessageToPlayer(sender, "Invalid number of seconds");
+                return false;
+            case 0:
+                sender.Message("value must be greater or smaller than 0");
+                return false;
+        }
+
+        server.RoundSettings.SecondsLeft += seconds.Value;
+        server.SayToAllChat($"Round time {(seconds.Value >= 0 ? "extended" : "shortened")} by {Formatting.LengthFromSeconds(seconds.Value >= 0 ? seconds.Value : -seconds.Value)}");
+        return false;
+    }
+
+    private static bool Top5Cmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    {
+        sender.Message(Stats.TopN(5));
+        return true;
+    }
+
+    private static bool RtvCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    {
+        var now = DateTime.UtcNow;
+        if (now.Subtract(RtvStartTime).TotalMinutes > 5)
+        {
+            RtvStartTime = DateTime.UtcNow;
+            RtvVotes = 0;
+            VotedRtv.Clear();
+        }
+
+        var totalPlayers = server.AllPlayers.Count();
+        var requiredVotes = (int)Math.Ceiling(totalPlayers * 0.6);
+        if (VotedRtv.TryGetValue(sender.SteamID, out var lastVote))
+            if (now.Subtract(lastVote).TotalMinutes < 5)
+            {
+                sender.Message($"You have already voted to rock the vote in the last 5 minutes!\nCurrent votes: {RtvVotes} of {requiredVotes} required");
+                return false;
+            }
+
+        VotedRtv[sender.SteamID] = now;
+        RtvVotes++;
+        if (RtvVotes >= requiredVotes)
+        {
+            server.SayToAllChat("Rock the vote passed! Changing map...");
+            RtvVotes = 0;
+            VotedRtv.Clear();
+            server.ForceEndGame();
+        }
+        else
+        {
+            server.SayToAllChat($"{sender.Name} wants to rock the vote: {RtvVotes} of {requiredVotes} votes required");
+        }
+
+        return true;
+    }
+
+    private static bool FeedbackCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    {
+        if (args.Count() < 1)
+        {
+            sender.Message("use: feedback message...", 5f);
             return true;
         }
 
-        server.MessageToPlayer(sender, $"Your rank is {rank.First().rank}");
+        var message = args.GetRemainingString();
+
+        try
+        {
+            MyGameServer.Db.Suggestions.Add(new Suggestion
+            {
+                Feedback = message!,
+                PlayerId = MyGameServer.Db.Players.FirstOrDefault(p => p.SteamId == (long)sender.SteamID)?.Id,
+                CreatedAt = default,
+                UpdatedAt = default
+            });
+            MyGameServer.Db.SaveChanges();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            throw;
+        }
+
+        sender.Message($"Thank you for your feedback! We received:\n {RichText.Magenta}{message}");
+        return true;
+    }
+
+    private static bool RankCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    {
+        var rank = Stats.Rank(sender.SteamID);
+        if (rank.rank == -1)
+        {
+            sender.Message($"Your rank will show up next map!\nThis is a limitation of the game and will be adjusted in the future\nKeep slaying though, because your points are being calculated!\nTotal ranked players: {rank.totalRanked}");
+            return true;
+        }
+
+        var stats = Stats.Statistics(sender.SteamID);
+        if (stats == null)
+        {
+            sender.Message("Your stats are not being tracked");
+            return true;
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine("======== Rank ========");
+        sb.AppendLine($"Rank: {rank.rank}/{rank.totalRanked}");
+        sb.AppendLine($"Kills: {stats.KillCount}");
+        sb.AppendLine($"Deaths: {stats.DeathCount}");
+        sb.AppendLine($"K/D: {(stats.DeathCount > 0 ? Math.Round(stats.KillCount / (float)stats.DeathCount, 2) : stats.KillCount)}");
+        sb.AppendLine($"Play Time: {Formatting.LengthFromSeconds(stats.PlayTimeSeconds)}");
+        sb.AppendLine($"Total Score: {stats.TotalScore}");
+        sb.AppendLine("======================");
+        server.MessageToPlayer(sender, sb.ToString(), 10f);
         return true;
     }
 
