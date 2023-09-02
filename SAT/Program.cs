@@ -70,6 +70,16 @@ public class MyGameServer : GameServer<MyPlayer>
         });
     }
 
+    public override async Task OnRoundStarted()
+    {
+        Formatting.SafeSetLoadingScreenText(ConfigurationManager.Config.join_text + "\n" + Stats.TopN(3), this);
+    }
+
+    public override async Task OnRoundEnded()
+    {
+        Formatting.SafeSetLoadingScreenText(ConfigurationManager.Config.join_text + "\n" + Stats.TopN(3), this);
+    }
+
     public override async Task OnPlayerConnected(MyPlayer player)
     {
         try
