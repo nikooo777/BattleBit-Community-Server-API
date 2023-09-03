@@ -114,7 +114,7 @@ public static class ChatProcessor
     {
         if (args.Count() != 1)
         {
-            server.MessageToPlayer(sender, "Invalid number of arguments for extend command (<seconds>)");
+            server.MessageToPlayer(sender, "Invalid number of arguments for extend command (<minutes>)");
             return false;
         }
 
@@ -122,14 +122,14 @@ public static class ChatProcessor
         switch (seconds)
         {
             case null:
-                server.MessageToPlayer(sender, "Invalid number of seconds");
+                server.MessageToPlayer(sender, "Invalid number of minutes");
                 return false;
             case 0:
                 sender.Message("value must be greater or smaller than 0");
                 return false;
         }
 
-        server.RoundSettings.SecondsLeft += seconds.Value;
+        server.RoundSettings.SecondsLeft += seconds.Value * 60;
         server.SayToAllChat($"Round time {(seconds.Value >= 0 ? "extended" : "shortened")} by {Formatting.LengthFromSeconds(seconds.Value >= 0 ? seconds.Value : -seconds.Value)}");
         return false;
     }

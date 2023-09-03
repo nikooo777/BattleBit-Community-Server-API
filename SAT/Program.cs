@@ -6,6 +6,7 @@ using SAT.Models;
 using SAT.rank;
 using SAT.SwissAdminTools;
 using SAT.Utils;
+using SwissAdminTools.RoundManager;
 using Admin = SAT.SwissAdminTools.Admin;
 using Restrictions = SAT.SwissAdminTools.Restrictions;
 
@@ -18,11 +19,7 @@ internal class Program
         Console.WriteLine(ConfigurationManager.Config.join_text);
         const int port = 1337;
         var listener = new ServerListener<MyPlayer, MyGameServer>();
-        listener.OnGameServerConnected += async server =>
-        {
-            Console.WriteLine($"Gameserver connected! {server.GameIP}:{server.GamePort} {server.ServerName}");
-            server.ServerSettings.PlayerCollision = true;
-        };
+        listener.OnGameServerConnected += async server => { Console.WriteLine($"Gameserver connected! {server.GameIP}:{server.GamePort} {server.ServerName}"); };
         listener.Start(port);
         Console.WriteLine($"APIs Server started on port {port}");
         Thread.Sleep(-1);
@@ -31,12 +28,15 @@ internal class Program
 
 public class MyGameServer : GameServer<MyPlayer>
 {
+    public bool AllowBleeding;
+
     public MyGameServer()
     {
         Db = new BattlebitContext();
     }
 
     public static BattlebitContext Db { get; set; }
+    public bool CanSpawnOnPlayers { get; set; }
 
     public override async Task OnConnected()
     {
@@ -61,7 +61,24 @@ public class MyGameServer : GameServer<MyPlayer>
             var exists = Enum.TryParse(rt, true, out WeaponType wepType);
             if (exists)
                 Restrictions.AddCategoryRestriction(wepType);
+            else
+                Console.WriteLine("Could not find weapon type " + rt + "");
         }
+
+        foreach (var rt in ConfigurationManager.Config.restrictions.weapons)
+        {
+            Console.WriteLine("Adding restriction for " + rt + "");
+            var exists = Weapons.TryFind(rt, out var wep);
+            if (exists)
+                Restrictions.AddWeaponRestriction(wep);
+            else
+                Console.WriteLine("Could not find weapon " + rt + "");
+        }
+
+        ServerSettings.CanVoteNight = false;
+        // ServerSettings.UnlockAllAttachments = true;
+
+        MapRotation.SetRotation(ConfigurationManager.Config.rotations.maps.ToArray());
 
         Task.Run(() =>
         {
@@ -70,60 +87,24 @@ public class MyGameServer : GameServer<MyPlayer>
         });
     }
 
-    public override async Task OnRoundStarted()
-    {
-        Formatting.SafeSetLoadingScreenText(ConfigurationManager.Config.join_text + "\n" + Stats.TopN(3), this);
-    }
-
-    public override async Task OnRoundEnded()
-    {
-        Formatting.SafeSetLoadingScreenText(ConfigurationManager.Config.join_text + "\n" + Stats.TopN(3), this);
-    }
-
-    public override async Task OnPlayerConnected(MyPlayer player)
-    {
-        try
-        {
-            var existingPlayer = Db.Players.FirstOrDefault(p => (long)player.SteamID == p.SteamId);
-            if (existingPlayer != null)
-            {
-                // Update player
-                existingPlayer.Name = player.Name;
-                Db.SaveChanges();
-            }
-
-            player.Modifications.CanSpectate = existingPlayer!.Roles > (int)Roles.None;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error while updating player: {ex.Message}");
-        }
-
-        var blockDetails = Blocks.IsBlocked(player.SteamID, BlockType.Ban);
-        if (blockDetails.isBlocked)
-        {
-            player.Kick(blockDetails.reason);
-            return;
-        }
-
-        SayToAllChat(Advertisements.GetWelcomeMessage(player.Name));
-        Console.WriteLine($"[{DateTime.UtcNow}] Player {player.Name} - {player.SteamID} connected with IP {player.IP}");
-    }
 
     public override Task OnGameStateChanged(GameState oldState, GameState newState)
     {
-        if (newState == GameState.WaitingForPlayers)
+        switch (newState)
         {
-            RoundSettings.PlayersToStart = 0;
-            ForceStartGame();
-        }
-
-        if (newState == GameState.Playing)
-        {
-            RoundSettings.SecondsLeft = ConfigurationManager.Config.max_time;
-            RoundSettings.TeamATickets = ConfigurationManager.Config.max_tickets;
-            RoundSettings.TeamBTickets = ConfigurationManager.Config.max_tickets;
-            RoundSettings.MaxTickets = ConfigurationManager.Config.max_tickets;
+            case GameState.WaitingForPlayers:
+                RoundSettings.PlayersToStart = 0;
+                ForceStartGame();
+                break;
+            case GameState.Playing:
+                RoundSettings.SecondsLeft = ConfigurationManager.Config.max_time;
+                RoundSettings.TeamATickets = ConfigurationManager.Config.max_tickets;
+                RoundSettings.TeamBTickets = ConfigurationManager.Config.max_tickets;
+                RoundSettings.MaxTickets = ConfigurationManager.Config.max_tickets;
+                break;
+            case GameState.EndingGame:
+                RoundSettings.SecondsLeft = 5;
+                break;
         }
 
         return Task.CompletedTask;
@@ -133,9 +114,13 @@ public class MyGameServer : GameServer<MyPlayer>
     {
         var previousStats = Cache.Get(steamID);
         if (previousStats == null) return;
+
+        var dbPlayer = Db.Players.FirstOrDefault(player => player.SteamId == (long)steamID);
+        if (dbPlayer == null) return;
+
         var delta = Utils.Delta(stats.Progress, previousStats);
-        var dbProgress = Db.PlayerProgresses
-            .FirstOrDefault(playerProgress => playerProgress.Player.SteamId == (long)steamID && playerProgress.IsOfficial == 0);
+
+        var dbProgress = Db.PlayerProgresses.FirstOrDefault(playerProgress => playerProgress.PlayerId == dbPlayer.Id && playerProgress.IsOfficial == 0);
         if (dbProgress != null)
         {
             dbProgress = Utils.AddProgress(delta, dbProgress);
@@ -145,14 +130,24 @@ public class MyGameServer : GameServer<MyPlayer>
         {
             dbProgress = new PlayerProgress
             {
-                PlayerId = Db.Players.First(player => player.SteamId == (long)steamID).Id,
+                PlayerId = dbPlayer.Id,
                 IsOfficial = 0
             };
             dbProgress = Utils.AddProgress(delta, dbProgress);
             Db.PlayerProgresses.Add(dbProgress);
         }
 
+        //we currently overwrite these on connect because we can't yet deserialize these bytes and thus can't merge with official progression
+        dbPlayer.Selections = stats.Selections;
+        dbPlayer.ToolProgress = stats.ToolProgress;
+
         Db.SaveChanges();
+    }
+
+    public override async Task OnPlayerDisconnected(MyPlayer player)
+    {
+        Settings.SettingsBalancer(this);
+        Console.WriteLine($"[{DateTime.UtcNow}] Player {player.Name} - {player.SteamID} disconnected");
     }
 
     public override Task OnPlayerJoiningToServer(ulong steamId, PlayerJoiningArguments args)
@@ -184,7 +179,12 @@ public class MyGameServer : GameServer<MyPlayer>
                 existingDbProgress = Utils.AddProgress(delta, existingDbProgress);
                 Db.PlayerProgresses.Update(existingDbProgress);
                 Db.SaveChanges();
+
                 if (existingOwnDbProgress != null) args.Stats.Progress = Utils.Add(args.Stats.Progress, Utils.ProgressFrom(existingOwnDbProgress));
+
+                //this restores the progression of the weapons for the players. we can't really do this now because
+                //the way the progression is serialized is obscure and I still haven't figured out a way to merge official changes with ours
+                //args.Stats.ToolProgress = existingPlayer.ToolProgress; 
 
                 Cache.Set(steamId, args.Stats.Progress);
                 return Task.FromResult(args);
@@ -218,6 +218,37 @@ public class MyGameServer : GameServer<MyPlayer>
         }
 
         return Task.CompletedTask;
+    }
+
+    public override async Task OnPlayerConnected(MyPlayer player)
+    {
+        Settings.SettingsBalancer(this);
+        try
+        {
+            var existingPlayer = Db.Players.FirstOrDefault(p => (long)player.SteamID == p.SteamId);
+            if (existingPlayer != null)
+            {
+                // Update player
+                existingPlayer.Name = player.Name;
+                Db.SaveChanges();
+            }
+
+            player.Modifications.CanSpectate = existingPlayer!.Roles > (int)Roles.None;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error while updating player: {ex.Message}");
+        }
+
+        var blockDetails = Blocks.IsBlocked(player.SteamID, BlockType.Ban);
+        if (blockDetails.isBlocked)
+        {
+            player.Kick(blockDetails.reason);
+            return;
+        }
+
+        SayToAllChat(Advertisements.GetWelcomeMessage(player.Name));
+        Console.WriteLine($"[{DateTime.UtcNow}] Player {player.Name} - {player.SteamID} connected with IP {player.IP}");
     }
 
     public override Task<bool> OnPlayerTypedMessage(MyPlayer player, ChatChannel channel, string msg)
@@ -269,22 +300,24 @@ public class MyGameServer : GameServer<MyPlayer>
         return Task.CompletedTask;
     }
 
-    public override async Task OnPlayerDisconnected(MyPlayer player)
-    {
-        Console.WriteLine($"[{DateTime.UtcNow}] Player {player.Name} - {player.SteamID} disconnected");
-    }
-
     public override async Task OnAPlayerDownedAnotherPlayer(OnPlayerKillArguments<MyPlayer> args)
     {
         var isSuicide = args.Killer.SteamID == args.Victim.SteamID;
         if (isSuicide)
         {
             Rank.AddSuicide(args.Killer.SteamID);
-            return;
+        }
+        else
+        {
+            Rank.AddKill(args.Killer.SteamID);
+            Rank.AddDeath(args.Victim.SteamID);
         }
 
-        Rank.AddKill(args.Killer.SteamID);
-        Rank.AddDeath(args.Victim.SteamID);
+        if (!AllowBleeding)
+        {
+            await Task.Delay(500);
+            args.Victim.Kill();
+        }
     }
 
     public override async Task OnAPlayerRevivedAnotherPlayer(MyPlayer from, MyPlayer to)
@@ -294,7 +327,18 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override async Task OnPlayerDied(MyPlayer player)
     {
-        player.Modifications.RespawnTime = 5;
+        player.Modifications.RespawnTime = 5f;
+        player.Modifications.SpawningRule = CanSpawnOnPlayers ? SpawningRule.All : SpawningRule.None;
+    }
+
+    public override async Task OnRoundStarted()
+    {
+        Formatting.SafeSetLoadingScreenText(ConfigurationManager.Config.join_text + "\n" + Stats.TopN(3), this);
+    }
+
+    public override async Task OnRoundEnded()
+    {
+        Formatting.SafeSetLoadingScreenText(ConfigurationManager.Config.join_text + "\n" + Stats.TopN(3), this);
     }
 }
 
