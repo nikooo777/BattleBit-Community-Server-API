@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 
@@ -30,6 +30,8 @@ public partial class BattlebitContext : DbContext
 
     public virtual DbSet<PlayerReport> PlayerReports { get; set; }
 
+    public virtual DbSet<Stat> Stats { get; set; }
+
     public virtual DbSet<Suggestion> Suggestions { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -39,14 +41,17 @@ public partial class BattlebitContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
-            .UseCollation("utf8mb4_unicode_ci")
-            .HasCharSet("utf8mb4");
+            .UseCollation("utf8mb3_unicode_ci")
+            .HasCharSet("utf8mb3");
 
         modelBuilder.Entity<Admin>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("admins");
+            entity
+                .ToTable("admins")
+                .HasCharSet("utf8mb4")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.SteamId, "steam_id").IsUnique();
 
@@ -65,7 +70,10 @@ public partial class BattlebitContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("blocks");
+            entity
+                .ToTable("blocks")
+                .HasCharSet("utf8mb4")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.IssuerAdminId, "issuer_admin_id");
 
@@ -98,7 +106,10 @@ public partial class BattlebitContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("chat_logs");
+            entity
+                .ToTable("chat_logs")
+                .HasCharSet("utf8mb4")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.PlayerId, "player_id");
 
@@ -122,7 +133,6 @@ public partial class BattlebitContext : DbContext
 
             entity
                 .ToTable("gorp_migrations")
-                .HasCharSet("utf8mb3")
                 .UseCollation("utf8mb3_general_ci");
 
             entity.Property(e => e.Id).HasColumnName("id");
@@ -135,7 +145,10 @@ public partial class BattlebitContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("player");
+            entity
+                .ToTable("player")
+                .HasCharSet("utf8mb4")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.SteamId, "steam_id").IsUnique();
 
@@ -170,7 +183,10 @@ public partial class BattlebitContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("player_progress");
+            entity
+                .ToTable("player_progress")
+                .HasCharSet("utf8mb4")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => new { e.PlayerId, e.IsOfficial }, "player_progress_player_uniq").IsUnique();
 
@@ -240,7 +256,10 @@ public partial class BattlebitContext : DbContext
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("player_reports");
+            entity
+                .ToTable("player_reports")
+                .HasCharSet("utf8mb4")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.ReporterId, "player_reports_ibfk_1");
 
@@ -272,11 +291,36 @@ public partial class BattlebitContext : DbContext
                 .HasConstraintName("player_reports_ibfk_1");
         });
 
+        modelBuilder.Entity<Stat>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("stats")
+                .HasCharSet("utf8mb4")
+                .UseCollation("utf8mb4_unicode_ci");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp")
+                .HasColumnName("created_at");
+            entity.Property(e => e.PlayerCount).HasColumnName("player_count");
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp")
+                .HasColumnName("updated_at");
+        });
+
         modelBuilder.Entity<Suggestion>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PRIMARY");
 
-            entity.ToTable("suggestions");
+            entity
+                .ToTable("suggestions")
+                .HasCharSet("utf8mb4")
+                .UseCollation("utf8mb4_unicode_ci");
 
             entity.HasIndex(e => e.PlayerId, "player_id");
 

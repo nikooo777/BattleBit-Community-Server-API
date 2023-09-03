@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using SAT.Models;
-using SAT.Storage;
 using SwissAdminTools;
 
 namespace SAT.SwissAdminTools;
@@ -13,11 +12,9 @@ public class ChatLogger
     private static Timer _timer = new(FlushToDatabase, null, TimerInterval, TimerInterval);
 
 
-    public static void StoreChatLog(ulong steamId, string message)
+    public static void StoreChatLog(MyPlayer player, string message)
     {
-        var p = PlayersManager.GetPlayer(steamId);
-        if (p == null) return;
-        MessageQueue.Enqueue((message, p.Id));
+        MessageQueue.Enqueue((message, player.DbId));
         if (MessageQueue.Count >= MaxMessages)
             Task.Run(() => { FlushToDatabase(null); });
     }

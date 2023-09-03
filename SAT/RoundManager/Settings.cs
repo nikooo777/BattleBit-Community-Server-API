@@ -8,11 +8,11 @@ public class Settings
         {
             case <= 32:
                 server.CanSpawnOnPlayers = false;
-                server.AllowBleeding = false;
+                server.AllowReviving = false;
                 break;
             case > 32:
                 server.CanSpawnOnPlayers = true;
-                server.AllowBleeding = true;
+                server.AllowReviving = true;
                 break;
         }
     }

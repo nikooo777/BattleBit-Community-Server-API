@@ -1,9 +1,10 @@
-﻿using BattleBitAPI;
+using BattleBitAPI;
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
 using SAT.configs;
 using SAT.Models;
 using SAT.rank;
+using SAT.Statistics;
 using SAT.SwissAdminTools;
 using SAT.Utils;
 using SwissAdminTools.RoundManager;
@@ -28,7 +29,7 @@ internal class Program
 
 public class MyGameServer : GameServer<MyPlayer>
 {
-    public bool AllowBleeding;
+    public bool AllowReviving;
 
     public MyGameServer()
     {
@@ -42,6 +43,7 @@ public class MyGameServer : GameServer<MyPlayer>
     {
         var ads = new Advertisements(this);
         Task.Run(ads.Spam);
+        Task.Run(() => Statistics.TrackPlayerCount(this));
         if (RoundSettings.State == GameState.WaitingForPlayers)
         {
             RoundSettings.PlayersToStart = 0;
@@ -79,12 +81,6 @@ public class MyGameServer : GameServer<MyPlayer>
         // ServerSettings.UnlockAllAttachments = true;
 
         MapRotation.SetRotation(ConfigurationManager.Config.rotations.maps.ToArray());
-
-        Task.Run(() =>
-        {
-            //warm up the admin cache
-            foreach (var p in AllPlayers) Admin.IsPlayerAdmin(p.SteamID);
-        });
     }
 
 
@@ -225,15 +221,15 @@ public class MyGameServer : GameServer<MyPlayer>
         Settings.SettingsBalancer(this);
         try
         {
+            player.Modifications.CanSpectate = false;
             var existingPlayer = Db.Players.FirstOrDefault(p => (long)player.SteamID == p.SteamId);
             if (existingPlayer != null)
             {
                 // Update player
                 existingPlayer.Name = player.Name;
+                player.Modifications.CanSpectate = existingPlayer!.Roles > (int)Roles.None;
                 Db.SaveChanges();
             }
-
-            player.Modifications.CanSpectate = existingPlayer!.Roles > (int)Roles.None;
         }
         catch (Exception ex)
         {
@@ -253,7 +249,7 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override Task<bool> OnPlayerTypedMessage(MyPlayer player, ChatChannel channel, string msg)
     {
-        ChatLogger.StoreChatLog(player.SteamID, msg);
+        ChatLogger.StoreChatLog(player, msg);
         var res = ChatProcessor.ProcessChat(msg, player, this);
         if (!res) return Task.FromResult(false);
 
@@ -313,7 +309,7 @@ public class MyGameServer : GameServer<MyPlayer>
             Rank.AddDeath(args.Victim.SteamID);
         }
 
-        if (!AllowBleeding)
+        if (!AllowReviving)
         {
             await Task.Delay(500);
             args.Victim.Kill();
@@ -344,4 +340,26 @@ public class MyGameServer : GameServer<MyPlayer>
 
 public class MyPlayer : Player<MyPlayer>
 {
+    private int mDbId = -1;
+    private (bool initialized, bool isAdmin) mIsAdmin = (false, false);
+
+    public int DbId
+    {
+        get
+        {
+            if (mDbId != -1) return mDbId;
+            var existingPlayer = MyGameServer.Db.Players.FirstOrDefault(player => (long)SteamID == player.SteamId);
+            if (existingPlayer == null) return -1;
+            mDbId = existingPlayer.Id;
+            return mDbId;
+        }
+    }
+
+    public bool IsAdmin()
+    {
+        if (mIsAdmin.initialized) return mIsAdmin.isAdmin;
+        var admin = Admin.GetAdmin(SteamID);
+        mIsAdmin = (true, admin != null);
+        return mIsAdmin.isAdmin;
+    }
 }
