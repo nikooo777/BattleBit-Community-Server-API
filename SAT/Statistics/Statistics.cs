@@ -8,6 +8,7 @@ public static class Statistics
     public static void TrackPlayerCount(MyGameServer server)
     {
         var lastPlayerCount = -1;
+        Thread.Sleep(1000 * 10); // wait 10 seconds before starting
         while (true)
             //persist the player count every 1 minute if the count has changed
             if (server.CurrentPlayerCount != lastPlayerCount)
