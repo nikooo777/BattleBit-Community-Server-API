@@ -11,16 +11,22 @@ public static class Statistics
         while (true)
             //persist the player count every 1 minute if the count has changed
             if (server.CurrentPlayerCount != lastPlayerCount)
-            {
-                lastPlayerCount = server.CurrentPlayerCount;
-                MyGameServer.Db.Stats.Add(new Stat
+                try
                 {
-                    PlayerCount = server.CurrentPlayerCount,
-                    CreatedAt = default,
-                    UpdatedAt = default
-                });
-                MyGameServer.Db.SaveChanges();
-                Thread.Sleep(1000 * 60); // 1 minute
-            }
+                    lastPlayerCount = server.CurrentPlayerCount;
+                    MyGameServer.Db.Stats.Add(new Stat
+                    {
+                        PlayerCount = server.CurrentPlayerCount,
+                        CreatedAt = default,
+                        UpdatedAt = default
+                    });
+                    MyGameServer.Db.SaveChanges();
+                    Thread.Sleep(1000 * 60); // 1 minute
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                    throw;
+                }
     }
 }
