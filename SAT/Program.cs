@@ -1,7 +1,9 @@
 using BattleBitAPI;
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
+using Microsoft.EntityFrameworkCore;
 using SAT.configs;
+using SAT.Db;
 using SAT.Models;
 using SAT.rank;
 using SAT.Statistics;
@@ -29,14 +31,11 @@ internal class Program
 
 public class MyGameServer : GameServer<MyPlayer>
 {
+    private static readonly DbContextPool DbPool = new(16);
     public bool AllowReviving;
 
-    public MyGameServer()
-    {
-        Db = new BattlebitContext();
-    }
+    public static BattlebitContext Dbx => DbPool.GetContext();
 
-    public static BattlebitContext Db { get; set; }
     public bool CanSpawnOnPlayers { get; set; }
 
     public override async Task OnConnected()
@@ -106,23 +105,24 @@ public class MyGameServer : GameServer<MyPlayer>
         return Task.CompletedTask;
     }
 
-    public override async Task OnSavePlayerStats(ulong steamID, PlayerStats stats)
+    public override async Task OnSavePlayerStats(ulong steamId, PlayerStats stats)
     {
-        var previousStats = Cache.Get(steamID);
+        var previousStats = Cache.Get(steamId);
         if (previousStats == null) return;
 
-        var dbPlayer = Db.Players.FirstOrDefault(player => player.SteamId == (long)steamID);
+        //calculate delta and store to database
+        using var db = Dbx;
+        var dbPlayer = db.Players.FirstOrDefault(player => player.SteamId == (long)steamId);
         if (dbPlayer == null) return;
 
         var delta = Utils.Delta(stats.Progress, previousStats);
 
-        var dbProgress = Db.PlayerProgresses.FirstOrDefault(playerProgress => playerProgress.PlayerId == dbPlayer.Id && playerProgress.IsOfficial == 0);
+        var dbProgress = db.PlayerProgresses.FirstOrDefault(playerProgress => playerProgress.PlayerId == dbPlayer.Id && playerProgress.IsOfficial == 0);
         if (dbProgress != null)
         {
             dbProgress = Utils.AddProgress(delta, dbProgress);
-            Db.PlayerProgresses.Update(dbProgress);
-        }
-        else
+            db.PlayerProgresses.Update(dbProgress);
+        } else
         {
             dbProgress = new PlayerProgress
             {
@@ -130,14 +130,26 @@ public class MyGameServer : GameServer<MyPlayer>
                 IsOfficial = 0
             };
             dbProgress = Utils.AddProgress(delta, dbProgress);
-            Db.PlayerProgresses.Add(dbProgress);
+            db.PlayerProgresses.Add(dbProgress);
         }
+
+
+        //work around the following issue: https://scrn.storni.info/2023-09-05_02-47-21-055320628.png
+        if (RoundSettings.State == GameState.EndingGame)
+        {
+            Cache.Set(steamId, stats.Progress);
+            Console.WriteLine("map is changing, not counting this as a disconnect");
+        } else
+        {
+            Cache.Remove(steamId);
+            Console.WriteLine("player disconnected, counting this as a disconnect");
+        }
+
 
         //we currently overwrite these on connect because we can't yet deserialize these bytes and thus can't merge with official progression
         dbPlayer.Selections = stats.Selections;
         dbPlayer.ToolProgress = stats.ToolProgress;
-
-        Db.SaveChanges();
+        db.SaveChanges();
     }
 
     public override async Task OnPlayerDisconnected(MyPlayer player)
@@ -152,61 +164,88 @@ public class MyGameServer : GameServer<MyPlayer>
         {
             var isAdmin = Admin.IsPlayerAdmin(steamId);
             if (isAdmin) args.Stats.Roles = Roles.Admin;
-
-
-            var existingPlayer = Db.Players.FirstOrDefault(player => (long)steamId == player.SteamId);
-            if (existingPlayer != null)
+            using var db = Dbx;
+            var existingPlayer = db.Players.Include(player => player.PlayerProgresses).FirstOrDefault(player => (long)steamId == player.SteamId);
+            if (existingPlayer == null)
             {
-                // Update player
-                existingPlayer.IsBanned = args.Stats.IsBanned;
-                existingPlayer.Roles = (int)args.Stats.Roles;
-                existingPlayer.Achievements = args.Stats.Achievements;
-                existingPlayer.Selections = args.Stats.Selections;
-                existingPlayer.ToolProgress = args.Stats.ToolProgress;
-
-                // Update player progress
-                var existingDbProgress = Db.PlayerProgresses
-                    .First(playerProgress => playerProgress.PlayerId == existingPlayer.Id && playerProgress.IsOfficial == 1);
-                var existingOwnDbProgress = Db.PlayerProgresses
-                    .FirstOrDefault(playerProgress => playerProgress.PlayerId == existingPlayer.Id && playerProgress.IsOfficial == 0);
-
-                var gameProgress = Utils.ProgressFrom(existingDbProgress);
-                var delta = Utils.Delta(args.Stats.Progress, gameProgress);
-                existingDbProgress = Utils.AddProgress(delta, existingDbProgress);
-                Db.PlayerProgresses.Update(existingDbProgress);
-                Db.SaveChanges();
-
-                if (existingOwnDbProgress != null) args.Stats.Progress = Utils.Add(args.Stats.Progress, Utils.ProgressFrom(existingOwnDbProgress));
-
-                //this restores the progression of the weapons for the players. we can't really do this now because
-                //the way the progression is serialized is obscure and I still haven't figured out a way to merge official changes with ours
-                //args.Stats.ToolProgress = existingPlayer.ToolProgress; 
-
                 Cache.Set(steamId, args.Stats.Progress);
+                //todo: create player
+                //todo: populate db with official stats
+                var p = Utils.NewPlayerFrom(steamId, args.Stats);
+                var newDbProgress = Utils.SetProgress(args.Stats.Progress, new PlayerProgress { IsOfficial = 1 });
+                var newPlayer = db.Players.Add(p);
+                newPlayer.Entity.PlayerProgresses.Add(newDbProgress);
+                db.SaveChanges();
+
                 return Task.FromResult(args);
             }
 
-            Cache.Set(steamId, args.Stats.Progress);
-            var newPlayer = Db.Players.Add(new Player
-            {
-                SteamId = (long)steamId,
-                IsBanned = args.Stats.IsBanned,
-                Name = "Joining...",
-                Roles = (int)args.Stats.Roles,
-                Achievements = args.Stats.Achievements,
-                Selections = args.Stats.Selections,
-                ToolProgress = args.Stats.ToolProgress,
-                CreatedAt = default,
-                UpdatedAt = default,
-                ChatLogs = new List<ChatLog>(),
-                PlayerProgresses = new List<PlayerProgress>(),
-                PlayerReportReportedPlayers = new List<PlayerReport>(),
-                PlayerReportReporters = new List<PlayerReport>()
-            });
-            var dbProgress = Utils.SetProgress(args.Stats.Progress, new PlayerProgress { IsOfficial = 1 });
-            newPlayer.Entity.PlayerProgresses.Add(dbProgress);
 
-            Db.SaveChanges();
+            // Update player properties
+            existingPlayer.IsBanned = args.Stats.IsBanned;
+            existingPlayer.Roles = (int)args.Stats.Roles;
+            existingPlayer.Achievements = args.Stats.Achievements;
+            existingPlayer.Selections = args.Stats.Selections;
+            existingPlayer.ToolProgress = args.Stats.ToolProgress;
+            db.SaveChanges();
+
+            var cachedStats = Cache.Get(steamId, true);
+            PlayerProgress? unofficialProgress = null;
+            PlayerProgress? officialProgress = null;
+
+            foreach (var pp in existingPlayer.PlayerProgresses)
+            {
+                if (pp.IsOfficial == 0)
+                {
+                    unofficialProgress = pp;
+                } else
+                {
+                    officialProgress = pp;
+                }
+            }
+
+            if (officialProgress == null)
+            {
+                Console.WriteLine("ERROR: player has no official progress - creating one exceptionally");
+                //todo: populate db with official stats
+                var newDbProgress = Utils.SetProgress(args.Stats.Progress, new PlayerProgress { IsOfficial = 1 });
+                existingPlayer.PlayerProgresses.Add(newDbProgress);
+                db.SaveChanges();
+                return Task.FromResult(args);
+            }
+
+            if (unofficialProgress == null)
+            {
+                return Task.FromResult(args);
+            }
+
+            //also check if cached stats are stale (could happen if people disconnect when the map ends)
+            const int stalenessThreshold = 120;
+            if (cachedStats != null && args.Stats.Progress.PlayTimeSeconds > officialProgress.PlayTimeSeconds + stalenessThreshold)
+            {
+                /*
+                 * ignore official stats and unofficial stats, we already have what we need
+                 * set that as return val
+                 */
+
+                args.Stats.Progress = cachedStats;
+                return Task.FromResult(args);
+            }
+
+            /*
+             * set official stats in the cache
+             * set official stats in db
+             * sum official stats with unofficial
+             * return summed stats
+             */
+
+            Cache.Set(steamId, args.Stats.Progress);
+            officialProgress = Utils.SetProgress(args.Stats.Progress, officialProgress);
+            db.PlayerProgresses.Update(officialProgress);
+            db.SaveChanges();
+            var summedProgress = Utils.AddProgress(args.Stats.Progress, unofficialProgress);
+            args.Stats.Progress = Utils.ProgressFrom(summedProgress);
+            return Task.FromResult(args);
         }
         catch (Exception ex)
         {
@@ -222,13 +261,14 @@ public class MyGameServer : GameServer<MyPlayer>
         try
         {
             player.Modifications.CanSpectate = false;
-            var existingPlayer = Db.Players.FirstOrDefault(p => (long)player.SteamID == p.SteamId);
+            using var db = Dbx;
+            var existingPlayer = db.Players.FirstOrDefault(p => (long)player.SteamID == p.SteamId);
             if (existingPlayer != null)
             {
                 // Update player
                 existingPlayer.Name = player.Name;
                 player.Modifications.CanSpectate = existingPlayer!.Roles > (int)Roles.None;
-                Db.SaveChanges();
+                db.SaveChanges();
             }
         }
         catch (Exception ex)
@@ -278,8 +318,9 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override Task OnPlayerReported(MyPlayer from, MyPlayer to, ReportReason reason, string additional)
     {
-        var reporterId = Db.Players.FirstOrDefault(player => player.SteamId == (long)from.SteamID)?.Id;
-        var reportedPlayerId = Db.Players.FirstOrDefault(player => player.SteamId == (long)to.SteamID);
+        using var db = Dbx;
+        var reporterId = db.Players.FirstOrDefault(player => player.SteamId == (long)from.SteamID)?.Id;
+        var reportedPlayerId = db.Players.FirstOrDefault(player => player.SteamId == (long)to.SteamID);
         if (reporterId == null || reportedPlayerId == null) return Task.CompletedTask;
 
         var report = new PlayerReport
@@ -291,8 +332,8 @@ public class MyGameServer : GameServer<MyPlayer>
             ReportedPlayer = reportedPlayerId,
             Timestamp = DateTime.Now
         };
-        Db.PlayerReports.Add(report);
-        Db.SaveChanges();
+        db.PlayerReports.Add(report);
+        db.SaveChanges();
         return Task.CompletedTask;
     }
 
@@ -302,8 +343,7 @@ public class MyGameServer : GameServer<MyPlayer>
         if (isSuicide)
         {
             Rank.AddSuicide(args.Killer.SteamID);
-        }
-        else
+        } else
         {
             Rank.AddKill(args.Killer.SteamID);
             Rank.AddDeath(args.Victim.SteamID);
@@ -348,7 +388,8 @@ public class MyPlayer : Player<MyPlayer>
         get
         {
             if (mDbId != -1) return mDbId;
-            var existingPlayer = MyGameServer.Db.Players.FirstOrDefault(player => (long)SteamID == player.SteamId);
+            using var db = MyGameServer.Dbx;
+            var existingPlayer = db.Players.FirstOrDefault(player => (long)SteamID == player.SteamId);
             if (existingPlayer == null) return -1;
             mDbId = existingPlayer.Id;
             return mDbId;

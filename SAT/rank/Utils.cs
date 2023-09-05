@@ -248,4 +248,25 @@ public class Utils
         a.TotalScore += b.TotalScore;
         return a;
     }
+
+    public static Player NewPlayerFrom(ulong steamId, PlayerStats playerStats)
+    {
+        var newPlayer = new Player
+        {
+            SteamId = (long)steamId,
+            IsBanned = playerStats.IsBanned,
+            Name = "Joining...",
+            Roles = (int)playerStats.Roles,
+            Achievements = playerStats.Achievements,
+            Selections = playerStats.Selections,
+            ToolProgress = playerStats.ToolProgress,
+            CreatedAt = default,
+            UpdatedAt = default,
+            ChatLogs = new List<ChatLog>(),
+            PlayerProgresses = new List<PlayerProgress>(),
+            PlayerReportReportedPlayers = new List<PlayerReport>(),
+            PlayerReportReporters = new List<PlayerReport>()
+        };
+        return newPlayer;
+    }
 }

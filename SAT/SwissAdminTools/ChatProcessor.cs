@@ -188,14 +188,15 @@ public static class ChatProcessor
 
         try
         {
-            MyGameServer.Db.Suggestions.Add(new Suggestion
+            using var db = MyGameServer.Dbx;
+            db.Suggestions.Add(new Suggestion
             {
                 Feedback = message!,
-                PlayerId = MyGameServer.Db.Players.FirstOrDefault(p => p.SteamId == (long)sender.SteamID)?.Id,
+                PlayerId = db.Players.FirstOrDefault(p => p.SteamId == (long)sender.SteamID)?.Id,
                 CreatedAt = default,
                 UpdatedAt = default
             });
-            MyGameServer.Db.SaveChanges();
+            db.SaveChanges();
         }
         catch (Exception e)
         {

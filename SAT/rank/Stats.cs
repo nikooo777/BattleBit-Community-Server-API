@@ -11,7 +11,8 @@ public class Stats
 {
     public static string TopN(int limit)
     {
-        var topPlayers = MyGameServer.Db.PlayerProgresses
+        using var db = MyGameServer.Dbx;
+        var topPlayers = db.PlayerProgresses
             .Where(progress => progress.IsOfficial.CompareTo(0) == 0)
             .OrderByDescending(progress => progress.TotalScore)
             .Include(progress => progress.Player)
@@ -33,15 +34,17 @@ public class Stats
 
     public static PlayerProgress? Statistics(ulong steamId)
     {
-        var playerId = MyGameServer.Db.Players.FirstOrDefault(p => p.SteamId == (long)steamId)?.Id;
-        var playerProgress = MyGameServer.Db.PlayerProgresses.FirstOrDefault(progress => progress.PlayerId == playerId);
+        using var db = MyGameServer.Dbx;
+        var playerId = db.Players.FirstOrDefault(p => p.SteamId == (long)steamId)?.Id;
+        var playerProgress = db.PlayerProgresses.FirstOrDefault(progress => progress.PlayerId == playerId);
         return playerProgress;
     }
 
     public static (int rank, int totalRanked) Rank(ulong steamId)
     {
-        var totalRankedPlayers = MyGameServer.Db.PlayerProgresses.Count(progress => progress.IsOfficial.CompareTo(0) == 0 && progress.TotalScore > 0);
-        var playerId = MyGameServer.Db.Players.FirstOrDefault(p => p.SteamId == (long)steamId)?.Id;
+        using var db = MyGameServer.Dbx;
+        var totalRankedPlayers = db.PlayerProgresses.Count(progress => progress.IsOfficial.CompareTo(0) == 0 && progress.TotalScore > 0);
+        var playerId = db.Players.FirstOrDefault(p => p.SteamId == (long)steamId)?.Id;
         var rawSql = $@"SELECT player_id, `rank`
 FROM (
     SELECT player_id, total_score,
@@ -51,7 +54,7 @@ FROM (
 ) AS ranked
 WHERE player_id = {playerId};";
 
-        var rank = MyGameServer.Db.RankResponses.FromSqlRaw(rawSql).ToList();
+        var rank = db.RankResponses.FromSqlRaw(rawSql).ToList();
         var currentRank = -1;
         if (rank.Count != 0) currentRank = rank[0].rank;
 

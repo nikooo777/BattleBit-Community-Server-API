@@ -24,12 +24,15 @@ public class ChatLogger
         if (!MessageQueue.Any())
             return;
         while (MessageQueue.TryDequeue(out var log))
-            MyGameServer.Db.ChatLogs.Add(new ChatLog
+        {
+            using var db = MyGameServer.Dbx;
+            db.ChatLogs.Add(new ChatLog
             {
                 Message = log.Message,
                 PlayerId = log.PlayerId,
                 Timestamp = DateTime.UtcNow
             });
-        MyGameServer.Db.SaveChanges();
+            db.SaveChanges();
+        }
     }
 }

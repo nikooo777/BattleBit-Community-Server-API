@@ -23,7 +23,8 @@ public class Blocks
             if (block.blocked)
                 return;
 
-        MyGameServer.Db.Blocks.Add(new Block
+        using var db = MyGameServer.Dbx;
+        db.Blocks.Add(new Block
         {
             SteamId = (long)steamId,
             BlockType = blockType.ToString(),
@@ -33,7 +34,7 @@ public class Blocks
             AdminIp = null,
             IssuerAdmin = issuerAdmin
         });
-        MyGameServer.Db.SaveChanges();
+        db.SaveChanges();
 
         blockDict[steamId] = (expiresAt, reason, true);
     }
@@ -56,7 +57,8 @@ public class Blocks
         var unixNow = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds();
         if (!isCached)
         {
-            var dbBlock = MyGameServer.Db.Blocks.FirstOrDefault(b => b.SteamId == (long)steamId && b.BlockType == blockType.ToString() && b.ExpiryDate > DateTime.UtcNow);
+            using var db = MyGameServer.Dbx;
+            var dbBlock = db.Blocks.FirstOrDefault(b => b.SteamId == (long)steamId && b.BlockType == blockType.ToString() && b.ExpiryDate > DateTime.UtcNow);
             if (dbBlock == null || dbBlock.ExpiryDate <= DateTime.UtcNow)
             {
                 blockDict[steamId] = (0, "", false);

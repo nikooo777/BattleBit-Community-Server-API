@@ -14,14 +14,15 @@ public static class Statistics
             if (server.CurrentPlayerCount != lastPlayerCount)
                 try
                 {
+                    using var db = MyGameServer.Dbx;
                     lastPlayerCount = server.CurrentPlayerCount;
-                    MyGameServer.Db.Stats.Add(new Stat
+                    db.Stats.Add(new Stat
                     {
                         PlayerCount = server.CurrentPlayerCount,
                         CreatedAt = default,
                         UpdatedAt = default
                     });
-                    MyGameServer.Db.SaveChanges();
+                    db.SaveChanges();
                     Thread.Sleep(1000 * 60); // 1 minute
                 }
                 catch (Exception e)

@@ -15,7 +15,8 @@ public class Admin
     public static Models.Admin? GetAdmin(ulong steamId)
     {
         if (Admins.TryGetValue(steamId, out var cachedAdmin)) return cachedAdmin;
-        var admin = MyGameServer.Db.Admins.FirstOrDefault(admin => admin.SteamId == (long)steamId);
+        using var db = MyGameServer.Dbx;
+        var admin = db.Admins.FirstOrDefault(admin => admin.SteamId == (long)steamId);
         if (admin == null)
         {
             Admins[steamId] = null;
