@@ -21,6 +21,7 @@ internal class Program
     {
         Console.WriteLine(ConfigurationManager.Config.join_text);
         const int port = 1337;
+        DbContextPool.Initialize(16);
         var listener = new ServerListener<MyPlayer, MyGameServer>();
         listener.OnGameServerConnected += async server => { Console.WriteLine($"Gameserver connected! {server.GameIP}:{server.GamePort} {server.ServerName}"); };
         listener.Start(port);
@@ -31,10 +32,9 @@ internal class Program
 
 public class MyGameServer : GameServer<MyPlayer>
 {
-    private static readonly DbContextPool DbPool = new(16);
     public bool AllowReviving;
 
-    public static BattlebitContext Dbx => DbPool.GetContext();
+    public static BattlebitContext Db => DbContextPool.GetContext();
 
     public bool CanSpawnOnPlayers { get; set; }
 
@@ -111,45 +111,56 @@ public class MyGameServer : GameServer<MyPlayer>
         if (previousStats == null) return;
 
         //calculate delta and store to database
-        using var db = Dbx;
-        var dbPlayer = db.Players.FirstOrDefault(player => player.SteamId == (long)steamId);
-        if (dbPlayer == null) return;
-
-        var delta = Utils.Delta(stats.Progress, previousStats);
-
-        var dbProgress = db.PlayerProgresses.FirstOrDefault(playerProgress => playerProgress.PlayerId == dbPlayer.Id && playerProgress.IsOfficial == 0);
-        if (dbProgress != null)
+        var db = Db;
+        try
         {
-            dbProgress = Utils.AddProgress(delta, dbProgress);
-            db.PlayerProgresses.Update(dbProgress);
-        } else
-        {
-            dbProgress = new PlayerProgress
+            var dbPlayer = db.Players.FirstOrDefault(player => player.SteamId == (long)steamId);
+            if (dbPlayer == null) return;
+
+            var delta = Utils.Delta(stats.Progress, previousStats);
+
+            var dbProgress = db.PlayerProgresses.FirstOrDefault(playerProgress => playerProgress.PlayerId == dbPlayer.Id && playerProgress.IsOfficial == 0);
+            if (dbProgress != null)
             {
-                PlayerId = dbPlayer.Id,
-                IsOfficial = 0
-            };
-            dbProgress = Utils.AddProgress(delta, dbProgress);
-            db.PlayerProgresses.Add(dbProgress);
+                dbProgress = Utils.AddProgress(delta, dbProgress);
+                db.PlayerProgresses.Update(dbProgress);
+            } else
+            {
+                dbProgress = new PlayerProgress
+                {
+                    PlayerId = dbPlayer.Id,
+                    IsOfficial = 0
+                };
+                dbProgress = Utils.AddProgress(delta, dbProgress);
+                db.PlayerProgresses.Add(dbProgress);
+            }
+
+
+            //work around the following issue: https://scrn.storni.info/2023-09-05_02-47-21-055320628.png
+            if (RoundSettings.State == GameState.EndingGame)
+            {
+                Cache.Set(steamId, stats.Progress);
+                Console.WriteLine("map is changing, not counting this as a disconnect");
+            } else
+            {
+                Cache.Remove(steamId);
+                Console.WriteLine("player disconnected, counting this as a disconnect");
+            }
+
+
+            //we currently overwrite these on connect because we can't yet deserialize these bytes and thus can't merge with official progression
+            dbPlayer.Selections = stats.Selections;
+            dbPlayer.ToolProgress = stats.ToolProgress;
+            db.SaveChanges();
         }
-
-
-        //work around the following issue: https://scrn.storni.info/2023-09-05_02-47-21-055320628.png
-        if (RoundSettings.State == GameState.EndingGame)
+        catch (Exception e)
         {
-            Cache.Set(steamId, stats.Progress);
-            Console.WriteLine("map is changing, not counting this as a disconnect");
-        } else
-        {
-            Cache.Remove(steamId);
-            Console.WriteLine("player disconnected, counting this as a disconnect");
+            Console.WriteLine("Error while saving player stats: " + e.Message);
         }
-
-
-        //we currently overwrite these on connect because we can't yet deserialize these bytes and thus can't merge with official progression
-        dbPlayer.Selections = stats.Selections;
-        dbPlayer.ToolProgress = stats.ToolProgress;
-        db.SaveChanges();
+        finally
+        {
+            DbContextPool.ReturnContext(db);
+        }
     }
 
     public override async Task OnPlayerDisconnected(MyPlayer player)
@@ -160,11 +171,11 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override Task OnPlayerJoiningToServer(ulong steamId, PlayerJoiningArguments args)
     {
+        var db = Db;
         try
         {
             var isAdmin = Admin.IsPlayerAdmin(steamId);
             if (isAdmin) args.Stats.Roles = Roles.Admin;
-            using var db = Dbx;
             var existingPlayer = db.Players.Include(player => player.PlayerProgresses).FirstOrDefault(player => (long)steamId == player.SteamId);
             if (existingPlayer == null)
             {
@@ -251,6 +262,10 @@ public class MyGameServer : GameServer<MyPlayer>
         {
             Console.WriteLine($"Error while storing player: {ex.Message}");
         }
+        finally
+        {
+            DbContextPool.ReturnContext(db);
+        }
 
         return Task.CompletedTask;
     }
@@ -258,10 +273,10 @@ public class MyGameServer : GameServer<MyPlayer>
     public override async Task OnPlayerConnected(MyPlayer player)
     {
         Settings.SettingsBalancer(this);
+        var db = Db;
         try
         {
             player.Modifications.CanSpectate = false;
-            using var db = Dbx;
             var existingPlayer = db.Players.FirstOrDefault(p => (long)player.SteamID == p.SteamId);
             if (existingPlayer != null)
             {
@@ -274,6 +289,10 @@ public class MyGameServer : GameServer<MyPlayer>
         catch (Exception ex)
         {
             Console.WriteLine($"Error while updating player: {ex.Message}");
+        }
+        finally
+        {
+            DbContextPool.ReturnContext(db);
         }
 
         var blockDetails = Blocks.IsBlocked(player.SteamID, BlockType.Ban);
@@ -318,23 +337,35 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override Task OnPlayerReported(MyPlayer from, MyPlayer to, ReportReason reason, string additional)
     {
-        using var db = Dbx;
-        var reporterId = db.Players.FirstOrDefault(player => player.SteamId == (long)from.SteamID)?.Id;
-        var reportedPlayerId = db.Players.FirstOrDefault(player => player.SteamId == (long)to.SteamID);
-        if (reporterId == null || reportedPlayerId == null) return Task.CompletedTask;
-
-        var report = new PlayerReport
+        var db = Db;
+        try
         {
-            ReporterId = reporterId.Value,
-            Reason = reason + " " + additional,
-            Status = "Pending",
-            AdminNotes = null,
-            ReportedPlayer = reportedPlayerId,
-            Timestamp = DateTime.Now
-        };
-        db.PlayerReports.Add(report);
-        db.SaveChanges();
-        return Task.CompletedTask;
+            var reporterId = db.Players.FirstOrDefault(player => player.SteamId == (long)from.SteamID)?.Id;
+            var reportedPlayerId = db.Players.FirstOrDefault(player => player.SteamId == (long)to.SteamID);
+            if (reporterId == null || reportedPlayerId == null) return Task.CompletedTask;
+
+            var report = new PlayerReport
+            {
+                ReporterId = reporterId.Value,
+                Reason = reason + " " + additional,
+                Status = "Pending",
+                AdminNotes = null,
+                ReportedPlayer = reportedPlayerId,
+                Timestamp = DateTime.Now
+            };
+            db.PlayerReports.Add(report);
+            db.SaveChanges();
+            return Task.CompletedTask;
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            return Task.CompletedTask;
+        }
+        finally
+        {
+            DbContextPool.ReturnContext(db);
+        }
     }
 
     public override async Task OnAPlayerDownedAnotherPlayer(OnPlayerKillArguments<MyPlayer> args)
@@ -388,8 +419,9 @@ public class MyPlayer : Player<MyPlayer>
         get
         {
             if (mDbId != -1) return mDbId;
-            using var db = MyGameServer.Dbx;
+            var db = MyGameServer.Db;
             var existingPlayer = db.Players.FirstOrDefault(player => (long)SteamID == player.SteamId);
+            DbContextPool.ReturnContext(db);
             if (existingPlayer == null) return -1;
             mDbId = existingPlayer.Id;
             return mDbId;

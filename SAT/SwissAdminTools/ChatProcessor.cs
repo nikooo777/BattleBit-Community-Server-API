@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
 using CommunityServerAPI;
+using SAT.Db;
 using SAT.Models;
 using SAT.rank;
 using SAT.Utils;
@@ -167,8 +168,7 @@ public static class ChatProcessor
             RtvVotes = 0;
             VotedRtv.Clear();
             server.ForceEndGame();
-        }
-        else
+        } else
         {
             server.SayToAllChat($"{sender.Name} wants to rock the vote: {RtvVotes} of {requiredVotes} votes required");
         }
@@ -188,7 +188,7 @@ public static class ChatProcessor
 
         try
         {
-            using var db = MyGameServer.Dbx;
+            var db = MyGameServer.Db;
             db.Suggestions.Add(new Suggestion
             {
                 Feedback = message!,
@@ -197,6 +197,7 @@ public static class ChatProcessor
                 UpdatedAt = default
             });
             db.SaveChanges();
+            DbContextPool.ReturnContext(db);
         }
         catch (Exception e)
         {

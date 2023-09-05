@@ -1,6 +1,7 @@
 using BattleBitAPI.Common;
 using BattleBitAPI.Common.Threading;
 using Microsoft.EntityFrameworkCore;
+using SAT.Db;
 using SwissAdminTools;
 
 namespace SAT.rank;
@@ -24,8 +25,9 @@ public class Cache
             _cache.Value.TryGetValue(steamId, out var stats);
             if (cacheOnly || stats != null)
                 return stats;
-            using var db = MyGameServer.Dbx;
+            var db = MyGameServer.Db;
             var fetchedProgress = db.PlayerProgresses.Include(p => p.Player).FirstOrDefault(playerProgress => playerProgress.Player.SteamId == (long)steamId);
+            DbContextPool.ReturnContext(db);
             return fetchedProgress == null ? null : Utils.ProgressFrom(fetchedProgress);
         }
     }

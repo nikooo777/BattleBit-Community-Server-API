@@ -5,27 +5,27 @@ namespace SAT.Db;
 
 public class DbContextPool
 {
-    private readonly ConcurrentStack<BattlebitContext> contexts = new();
-    private readonly int maxPoolSize;
+    private static readonly ConcurrentStack<BattlebitContext> Contexts = new();
+    private static int _maxPoolSize;
 
-    public DbContextPool(int maxPoolSize)
+    public static void Initialize(int maxPoolSize)
     {
-        this.maxPoolSize = maxPoolSize;
+        _maxPoolSize = maxPoolSize;
     }
 
-    public BattlebitContext GetContext()
+    public static BattlebitContext GetContext()
     {
-        if (contexts.TryPop(out var dbContext)) return dbContext;
+        if (Contexts.TryPop(out var dbContext)) return dbContext;
 
         // If we reach here, no available dbContext in the pool, so create a new one.
         return new BattlebitContext();
     }
 
-    public void ReturnContext(BattlebitContext dbContext)
+    public static void ReturnContext(BattlebitContext dbContext)
     {
-        if (dbContext != null && contexts.Count < maxPoolSize)
-            contexts.Push(dbContext);
+        if (Contexts.Count < _maxPoolSize)
+            Contexts.Push(dbContext);
         else
-            dbContext?.Dispose();
+            dbContext.Dispose();
     }
 }

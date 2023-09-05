@@ -1,6 +1,7 @@
 using System.Text;
 using CommunityServerAPI;
 using Microsoft.EntityFrameworkCore;
+using SAT.Db;
 using SAT.Models;
 using SAT.Utils;
 using SwissAdminTools;
@@ -11,12 +12,13 @@ public class Stats
 {
     public static string TopN(int limit)
     {
-        using var db = MyGameServer.Dbx;
+        var db = MyGameServer.Db;
         var topPlayers = db.PlayerProgresses
             .Where(progress => progress.IsOfficial.CompareTo(0) == 0)
             .OrderByDescending(progress => progress.TotalScore)
             .Include(progress => progress.Player)
             .Take(limit);
+        DbContextPool.ReturnContext(db);
         var sb = new StringBuilder();
         sb.AppendLine($"Top {limit} Players");
         sb.AppendLine("==============");
@@ -34,15 +36,16 @@ public class Stats
 
     public static PlayerProgress? Statistics(ulong steamId)
     {
-        using var db = MyGameServer.Dbx;
+        var db = MyGameServer.Db;
         var playerId = db.Players.FirstOrDefault(p => p.SteamId == (long)steamId)?.Id;
         var playerProgress = db.PlayerProgresses.FirstOrDefault(progress => progress.PlayerId == playerId);
+        DbContextPool.ReturnContext(db);
         return playerProgress;
     }
 
     public static (int rank, int totalRanked) Rank(ulong steamId)
     {
-        using var db = MyGameServer.Dbx;
+        var db = MyGameServer.Db;
         var totalRankedPlayers = db.PlayerProgresses.Count(progress => progress.IsOfficial.CompareTo(0) == 0 && progress.TotalScore > 0);
         var playerId = db.Players.FirstOrDefault(p => p.SteamId == (long)steamId)?.Id;
         var rawSql = $@"SELECT player_id, `rank`
@@ -55,6 +58,7 @@ FROM (
 WHERE player_id = {playerId};";
 
         var rank = db.RankResponses.FromSqlRaw(rawSql).ToList();
+        DbContextPool.ReturnContext(db);
         var currentRank = -1;
         if (rank.Count != 0) currentRank = rank[0].rank;
 

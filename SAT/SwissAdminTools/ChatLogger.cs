@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using SAT.Db;
 using SAT.Models;
 using SwissAdminTools;
 
@@ -25,7 +26,7 @@ public class ChatLogger
             return;
         while (MessageQueue.TryDequeue(out var log))
         {
-            using var db = MyGameServer.Dbx;
+            var db = MyGameServer.Db;
             db.ChatLogs.Add(new ChatLog
             {
                 Message = log.Message,
@@ -33,6 +34,7 @@ public class ChatLogger
                 Timestamp = DateTime.UtcNow
             });
             db.SaveChanges();
+            DbContextPool.ReturnContext(db);
         }
     }
 }

@@ -1,3 +1,4 @@
+using SAT.Db;
 using SAT.Models;
 using SAT.Utils;
 using SwissAdminTools;
@@ -23,7 +24,7 @@ public class Blocks
             if (block.blocked)
                 return;
 
-        using var db = MyGameServer.Dbx;
+        var db = MyGameServer.Db;
         db.Blocks.Add(new Block
         {
             SteamId = (long)steamId,
@@ -35,6 +36,7 @@ public class Blocks
             IssuerAdmin = issuerAdmin
         });
         db.SaveChanges();
+        DbContextPool.ReturnContext(db);
 
         blockDict[steamId] = (expiresAt, reason, true);
     }
@@ -57,8 +59,9 @@ public class Blocks
         var unixNow = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds();
         if (!isCached)
         {
-            using var db = MyGameServer.Dbx;
+            var db = MyGameServer.Db;
             var dbBlock = db.Blocks.FirstOrDefault(b => b.SteamId == (long)steamId && b.BlockType == blockType.ToString() && b.ExpiryDate > DateTime.UtcNow);
+            DbContextPool.ReturnContext(db);
             if (dbBlock == null || dbBlock.ExpiryDate <= DateTime.UtcNow)
             {
                 blockDict[steamId] = (0, "", false);

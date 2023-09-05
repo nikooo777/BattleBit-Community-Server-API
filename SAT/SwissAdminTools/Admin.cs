@@ -1,3 +1,4 @@
+using SAT.Db;
 using SwissAdminTools;
 
 namespace SAT.SwissAdminTools;
@@ -15,8 +16,9 @@ public class Admin
     public static Models.Admin? GetAdmin(ulong steamId)
     {
         if (Admins.TryGetValue(steamId, out var cachedAdmin)) return cachedAdmin;
-        using var db = MyGameServer.Dbx;
+        var db = MyGameServer.Db;
         var admin = db.Admins.FirstOrDefault(admin => admin.SteamId == (long)steamId);
+        DbContextPool.ReturnContext(db);
         if (admin == null)
         {
             Admins[steamId] = null;

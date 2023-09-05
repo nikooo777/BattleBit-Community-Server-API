@@ -1,3 +1,4 @@
+using SAT.Db;
 using SAT.Models;
 using SwissAdminTools;
 
@@ -14,7 +15,7 @@ public static class Statistics
             if (server.CurrentPlayerCount != lastPlayerCount)
                 try
                 {
-                    using var db = MyGameServer.Dbx;
+                    var db = MyGameServer.Db;
                     lastPlayerCount = server.CurrentPlayerCount;
                     db.Stats.Add(new Stat
                     {
@@ -23,6 +24,7 @@ public static class Statistics
                         UpdatedAt = default
                     });
                     db.SaveChanges();
+                    DbContextPool.ReturnContext(db);
                     Thread.Sleep(1000 * 60); // 1 minute
                 }
                 catch (Exception e)
