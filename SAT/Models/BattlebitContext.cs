@@ -34,6 +34,10 @@ public partial class BattlebitContext : DbContext
 
     public virtual DbSet<Suggestion> Suggestions { get; set; }
 
+    public virtual DbSet<Tool> Tools { get; set; }
+
+    public virtual DbSet<ToolProgress> ToolProgresses { get; set; }
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see http://go.microsoft.com/fwlink/?LinkId=723263.
         => optionsBuilder.UseMySql("server=localhost;database=battlebit;user id=battlebit;password=battlebit", Microsoft.EntityFrameworkCore.ServerVersion.Parse("8.0.33-mysql"));
@@ -343,6 +347,58 @@ public partial class BattlebitContext : DbContext
                 .HasForeignKey(d => d.PlayerId)
                 .OnDelete(DeleteBehavior.SetNull)
                 .HasConstraintName("suggestions_ibfk_1");
+        });
+
+        modelBuilder.Entity<Tool>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("tools")
+                .HasCharSet("utf8mb4")
+                .UseCollation("utf8mb4_unicode_ci");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp")
+                .HasColumnName("created_at");
+            entity.Property(e => e.IngameId).HasColumnName("ingame_id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(255)
+                .HasDefaultValueSql("''")
+                .HasColumnName("name");
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp")
+                .HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<ToolProgress>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("tool_progress")
+                .HasCharSet("utf8mb4")
+                .UseCollation("utf8mb4_unicode_ci");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp")
+                .HasColumnName("created_at");
+            entity.Property(e => e.IsOfficial).HasColumnName("is_official");
+            entity.Property(e => e.Kills).HasColumnName("kills");
+            entity.Property(e => e.MaxDistance).HasColumnName("max_distance");
+            entity.Property(e => e.ToolId).HasColumnName("tool_id");
+            entity.Property(e => e.UpdatedAt)
+                .ValueGeneratedOnAddOrUpdate()
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("timestamp")
+                .HasColumnName("updated_at");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
         });
 
         OnModelCreatingPartial(modelBuilder);
