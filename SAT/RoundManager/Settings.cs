@@ -1,19 +1,33 @@
-namespace SwissAdminTools.RoundManager;
+using SwissAdminTools;
 
-public class Settings
+namespace SAT.RoundManager;
+
+public static class Settings
 {
     public static void SettingsBalancer(MyGameServer server)
     {
-        switch (server.CurrentPlayerCount)
+        if (server.CurrentPlayerCount <= 4)
         {
-            case <= 32:
+            foreach (var p in server.AllPlayers)
+            {
+                p.Modifications.IsExposedOnMap = true;
+            }
+        } else
+        {
+            foreach (var p in server.AllPlayers)
+            {
+                p.Modifications.IsExposedOnMap = false;
+            }
+
+            if (server.CurrentPlayerCount <= 32)
+            {
                 server.CanSpawnOnPlayers = false;
                 server.AllowReviving = false;
-                break;
-            case > 32:
+            } else
+            {
                 server.CanSpawnOnPlayers = true;
                 server.AllowReviving = true;
-                break;
+            }
         }
     }
 }

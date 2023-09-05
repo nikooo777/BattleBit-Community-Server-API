@@ -6,10 +6,10 @@ using SAT.configs;
 using SAT.Db;
 using SAT.Models;
 using SAT.rank;
+using SAT.RoundManager;
 using SAT.Statistics;
 using SAT.SwissAdminTools;
 using SAT.Utils;
-using SwissAdminTools.RoundManager;
 using Admin = SAT.SwissAdminTools.Admin;
 using Restrictions = SAT.SwissAdminTools.Restrictions;
 
