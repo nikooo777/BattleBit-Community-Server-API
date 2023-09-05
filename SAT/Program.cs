@@ -1,3 +1,4 @@
+using System.Numerics;
 using BattleBitAPI;
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
@@ -140,11 +141,9 @@ public class MyGameServer : GameServer<MyPlayer>
             if (RoundSettings.State == GameState.EndingGame)
             {
                 Cache.Set(steamId, stats.Progress);
-                Console.WriteLine("map is changing, not counting this as a disconnect");
             } else
             {
                 Cache.Remove(steamId);
-                Console.WriteLine("player disconnected, counting this as a disconnect");
             }
 
 
@@ -166,7 +165,7 @@ public class MyGameServer : GameServer<MyPlayer>
     public override async Task OnPlayerDisconnected(MyPlayer player)
     {
         Settings.SettingsBalancer(this);
-        Console.WriteLine($"[{DateTime.UtcNow}] Player {player.Name} - {player.SteamID} disconnected");
+        Console.WriteLine($"[{DateTime.UtcNow}] Player {player.Name} - {player.SteamID} disconnected. Total players: {CurrentPlayerCount - 1}");
     }
 
     public override Task OnPlayerJoiningToServer(ulong steamId, PlayerJoiningArguments args)
@@ -303,7 +302,7 @@ public class MyGameServer : GameServer<MyPlayer>
         }
 
         SayToAllChat(Advertisements.GetWelcomeMessage(player.Name));
-        Console.WriteLine($"[{DateTime.UtcNow}] Player {player.Name} - {player.SteamID} connected with IP {player.IP}");
+        Console.WriteLine($"[{DateTime.UtcNow}] Player {player.Name} - {player.SteamID} connected with IP {player.IP}. Total players: {CurrentPlayerCount + 1}");
     }
 
     public override Task<bool> OnPlayerTypedMessage(MyPlayer player, ChatChannel channel, string msg)
@@ -370,6 +369,7 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override async Task OnAPlayerDownedAnotherPlayer(OnPlayerKillArguments<MyPlayer> args)
     {
+        Console.WriteLine($"Player {args.Killer.Name} killed {args.Victim.Name} with {args.KillerTool} from a distance of {Vector3.Distance(args.KillerPosition, args.VictimPosition)}m");
         var isSuicide = args.Killer.SteamID == args.Victim.SteamID;
         if (isSuicide)
         {
