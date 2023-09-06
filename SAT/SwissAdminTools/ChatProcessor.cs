@@ -44,6 +44,7 @@ public static class ChatProcessor
     private static readonly Dictionary<string, Func<Arguments, MyPlayer, GameServer<MyPlayer>, bool>> PublicCommands = new()
     {
         // { "", Cmd },
+        { "wall", WallCmd },
         { "rtv", RtvCmd },
         { "feedback", FeedbackCmd },
         { "rank", RankCmd },
@@ -138,6 +139,12 @@ public static class ChatProcessor
     private static bool Top5Cmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
     {
         sender.Message(Stats.TopN(5));
+        return true;
+    }
+
+    private static bool WallCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
+    {
+        sender.HideWallHack = !sender.HideWallHack;
         return true;
     }
 

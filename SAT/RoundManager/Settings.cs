@@ -12,8 +12,11 @@ public static class Settings
             {
                 p.Modifications.IsExposedOnMap = true;
             }
+
+            server.TextWallHack = true;
         } else
         {
+            server.TextWallHack = false;
             foreach (var p in server.AllPlayers)
             {
                 p.Modifications.IsExposedOnMap = false;

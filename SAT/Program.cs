@@ -1,7 +1,9 @@
 using System.Numerics;
+using System.Text;
 using BattleBitAPI;
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
+using CommunityServerAPI;
 using SAT.configs;
 using SAT.Db;
 using SAT.Models;
@@ -37,6 +39,7 @@ public class MyGameServer : GameServer<MyPlayer>
     public static BattlebitContext Db => DbContextPool.GetContext();
 
     public bool CanSpawnOnPlayers { get; set; }
+    public bool TextWallHack { get; set; }
 
     public override async Task OnConnected()
     {
@@ -77,9 +80,9 @@ public class MyGameServer : GameServer<MyPlayer>
         }
 
         ServerSettings.CanVoteNight = false;
-        // ServerSettings.UnlockAllAttachments = true;
 
         MapRotation.SetRotation(ConfigurationManager.Config.rotations.maps.ToArray());
+        Settings.SettingsBalancer(this);
     }
 
 
@@ -402,10 +405,47 @@ public class MyGameServer : GameServer<MyPlayer>
     {
         Formatting.SafeSetLoadingScreenText(ConfigurationManager.Config.join_text + "\n" + Stats.TopN(3), this);
     }
+
+    public override Task OnTick()
+    {
+        if (TextWallHack)
+        {
+            var sb = new StringBuilder();
+            //get the distance between all players
+            //adding cache could reduce the amount of computations by half but since we do this for 4 players max it's not really worth it
+            sb.AppendLine($"Text/Map WallHack {RichText.Green}enabled{RichText.EndColor} with less than 5 players");
+            sb.AppendLine($"type {RichText.Red}wall{RichText.EndColor} to toggle it on/off");
+            sb.AppendLine("Generally once 2-3 players connect, more players will follow");
+            sb.AppendLine("Distance to other players:");
+            foreach (var p in AllPlayers)
+            {
+                if (!p.IsAlive || p.HideWallHack) continue;
+                foreach (var p2 in AllPlayers)
+                {
+                    if (p == p2) continue;
+                    if (!p2.IsAlive)
+                    {
+                        sb.AppendLine($"{p2.Name}: dead");
+                    }
+
+                    var distance = Vector3.Distance(p.Position, p2.Position);
+                    sb.AppendLine($"{p2.Name}: {distance}m");
+                }
+
+
+                p.Message(sb.ToString(), 10f);
+            }
+        }
+
+        //don't refresh every tick (tick callback is skipped while nothing is returned)
+        Thread.Sleep(500);
+        return Task.CompletedTask;
+    }
 }
 
 public class MyPlayer : Player<MyPlayer>
 {
+    public bool HideWallHack = false;
     private int mDbId = -1;
     private (bool initialized, bool isAdmin) mIsAdmin = (false, false);
 
