@@ -419,11 +419,11 @@ public class MyGameServer : GameServer<MyPlayer>
             sb.AppendLine("Distance to other players:");
             foreach (var p in AllPlayers)
             {
-                if (!p.IsAlive || p.HideWallHack) continue;
+                if (p.IsDead || !p.IsAlive || p.HideWallHack) continue;
                 foreach (var p2 in AllPlayers)
                 {
                     if (p == p2) continue;
-                    if (!p2.IsAlive)
+                    if (p.IsDead || !p2.IsAlive)
                     {
                         sb.AppendLine($"{p2.Name}: dead");
                     }
