@@ -410,19 +410,19 @@ public class MyGameServer : GameServer<MyPlayer>
     {
         if (TextWallHack)
         {
-            var sb = new StringBuilder();
-            //get the distance between all players
-            //adding cache could reduce the amount of computations by half but since we do this for 4 players max it's not really worth it
-            sb.AppendLine($"Text/Map WallHack {RichText.Green}enabled{RichText.EndColor} with less than 5 players");
-            sb.AppendLine($"type {RichText.Red}wall{RichText.EndColor} to toggle it on/off");
-            sb.AppendLine("Generally once 2-3 players connect, more players will follow");
-            sb.AppendLine("Distance to other players:");
             foreach (var p in AllPlayers)
             {
+                var sb = new StringBuilder();
+                //get the distance between all players
+                //adding cache could reduce the amount of computations by half but since we do this for 4 players max it's not really worth it
+                sb.AppendLine($"Text/Map WallHack {RichText.Green}enabled{RichText.EndColor} with less than 5 players");
+                sb.AppendLine($"type {RichText.Red}wall{RichText.EndColor} to toggle it on/off");
+                sb.AppendLine("Generally once 2-3 players connect, more players will follow");
+                sb.AppendLine("Distance to other players:");
                 if (p.IsDead || !p.IsAlive || p.HideWallHack) continue;
                 foreach (var p2 in AllPlayers)
                 {
-                    if (p == p2) continue;
+                    if (p.SteamID == p2.SteamID) continue;
                     if (p.IsDead || !p2.IsAlive)
                     {
                         sb.AppendLine($"{p2.Name}: dead");
