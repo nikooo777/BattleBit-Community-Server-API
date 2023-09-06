@@ -2,7 +2,6 @@ using System.Numerics;
 using BattleBitAPI;
 using BattleBitAPI.Common;
 using BattleBitAPI.Server;
-using Microsoft.EntityFrameworkCore;
 using SAT.configs;
 using SAT.Db;
 using SAT.Models;
@@ -100,6 +99,7 @@ public class MyGameServer : GameServer<MyPlayer>
                 break;
             case GameState.EndingGame:
                 RoundSettings.SecondsLeft = 5;
+                Cache.FlagMapChange();
                 break;
         }
 
@@ -109,14 +109,22 @@ public class MyGameServer : GameServer<MyPlayer>
     public override async Task OnSavePlayerStats(ulong steamId, PlayerStats stats)
     {
         var previousStats = Cache.Get(steamId);
-        if (previousStats == null) return;
+        if (previousStats == null)
+        {
+            Console.WriteLine("player has no cached stats, so no delta possible!");
+            return;
+        }
 
         //calculate delta and store to database
         var db = Db;
         try
         {
             var dbPlayer = db.Players.FirstOrDefault(player => player.SteamId == (long)steamId);
-            if (dbPlayer == null) return;
+            if (dbPlayer == null)
+            {
+                Console.WriteLine("player not found in db when leaving");
+                return;
+            }
 
             var delta = Utils.Delta(stats.Progress, previousStats);
 
@@ -175,7 +183,8 @@ public class MyGameServer : GameServer<MyPlayer>
         {
             var isAdmin = Admin.IsPlayerAdmin(steamId);
             if (isAdmin) args.Stats.Roles = Roles.Admin;
-            var existingPlayer = db.Players.Include(player => player.PlayerProgresses).FirstOrDefault(player => (long)steamId == player.SteamId);
+
+            var existingPlayer = db.Players.FirstOrDefault(player => (long)steamId == player.SteamId);
             if (existingPlayer == null)
             {
                 Cache.Set(steamId, args.Stats.Progress);
@@ -190,7 +199,6 @@ public class MyGameServer : GameServer<MyPlayer>
                 return Task.FromResult(args);
             }
 
-
             // Update player properties
             existingPlayer.IsBanned = args.Stats.IsBanned;
             existingPlayer.Roles = (int)args.Stats.Roles;
@@ -200,23 +208,11 @@ public class MyGameServer : GameServer<MyPlayer>
             db.SaveChanges();
 
             var cachedStats = Cache.Get(steamId, true);
-            PlayerProgress? unofficialProgress = null;
-            PlayerProgress? officialProgress = null;
-
-            foreach (var pp in existingPlayer.PlayerProgresses)
-            {
-                if (pp.IsOfficial == 0)
-                {
-                    unofficialProgress = pp;
-                } else
-                {
-                    officialProgress = pp;
-                }
-            }
+            var unofficialProgress = db.PlayerProgresses.FirstOrDefault(pp => pp.IsOfficial.CompareTo(0) == 0 && pp.PlayerId == existingPlayer.Id);
+            var officialProgress = db.PlayerProgresses.FirstOrDefault(pp => pp.IsOfficial.CompareTo(1) == 0 && pp.PlayerId == existingPlayer.Id);
 
             if (officialProgress == null)
             {
-                Console.WriteLine("ERROR: player has no official progress - creating one exceptionally");
                 //todo: populate db with official stats
                 var newDbProgress = Utils.SetProgress(args.Stats.Progress, new PlayerProgress { IsOfficial = 1 });
                 existingPlayer.PlayerProgresses.Add(newDbProgress);
@@ -226,18 +222,17 @@ public class MyGameServer : GameServer<MyPlayer>
 
             if (unofficialProgress == null)
             {
+                Cache.Set(steamId, args.Stats.Progress);
                 return Task.FromResult(args);
             }
 
-            //also check if cached stats are stale (could happen if people disconnect when the map ends)
-            const int stalenessThreshold = 120;
-            if (cachedStats != null && args.Stats.Progress.PlayTimeSeconds > officialProgress.PlayTimeSeconds + stalenessThreshold)
+            //also check if cached stats are stale (could happen if people disconnect when the map ends and reconnect after a while)
+            if (cachedStats != null && !Cache.IsStale())
             {
                 /*
                  * ignore official stats and unofficial stats, we already have what we need
                  * set that as return val
                  */
-
                 args.Stats.Progress = cachedStats;
                 return Task.FromResult(args);
             }
@@ -249,12 +244,12 @@ public class MyGameServer : GameServer<MyPlayer>
              * return summed stats
              */
 
-            Cache.Set(steamId, args.Stats.Progress);
             officialProgress = Utils.SetProgress(args.Stats.Progress, officialProgress);
             db.PlayerProgresses.Update(officialProgress);
             db.SaveChanges();
-            var summedProgress = Utils.AddProgress(args.Stats.Progress, unofficialProgress);
+            var summedProgress = Utils.AddProgress(args.Stats.Progress, Utils.Clone(unofficialProgress));
             args.Stats.Progress = Utils.ProgressFrom(summedProgress);
+            Cache.Set(steamId, args.Stats.Progress);
             return Task.FromResult(args);
         }
         catch (Exception ex)

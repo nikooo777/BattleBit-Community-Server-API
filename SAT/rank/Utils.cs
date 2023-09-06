@@ -99,6 +99,54 @@ public class Utils
         return dbProgress;
     }
 
+    public static PlayerProgress Clone(PlayerProgress p)
+    {
+        var newProgress = new PlayerProgress();
+        newProgress.KillCount = p.KillCount;
+        newProgress.LeaderKills = p.LeaderKills;
+        newProgress.AssaultKills = p.AssaultKills;
+        newProgress.MedicKills = p.MedicKills;
+        newProgress.EngineerKills = p.EngineerKills;
+        newProgress.SupportKills = p.SupportKills;
+        newProgress.ReconKills = p.ReconKills;
+        newProgress.DeathCount = p.DeathCount;
+        newProgress.WinCount = p.WinCount;
+        newProgress.LoseCount = p.LoseCount;
+        newProgress.FriendlyShots = p.FriendlyShots;
+        newProgress.FriendlyKills = p.FriendlyKills;
+        newProgress.Revived = p.Revived;
+        newProgress.RevivedTeamMates = p.RevivedTeamMates;
+        newProgress.Assists = p.Assists;
+        newProgress.Prestige = p.Prestige;
+        newProgress.CurrentRank = p.CurrentRank;
+        newProgress.Exp = p.Exp;
+        newProgress.ShotsFired = p.ShotsFired;
+        newProgress.ShotsHit = p.ShotsHit;
+        newProgress.Headshots = p.Headshots;
+        newProgress.CompletedObjectives = p.CompletedObjectives;
+        newProgress.HealedHps = p.HealedHps;
+        newProgress.RoadKills = p.RoadKills;
+        newProgress.Suicides = p.Suicides;
+        newProgress.VehiclesDestroyed = p.VehiclesDestroyed;
+        newProgress.VehicleHpRepaired = p.VehicleHpRepaired;
+        newProgress.LongestKill = p.LongestKill;
+        newProgress.PlayTimeSeconds = p.PlayTimeSeconds;
+        newProgress.LeaderPlayTime = p.LeaderPlayTime;
+        newProgress.AssaultPlayTime = p.AssaultPlayTime;
+        newProgress.MedicPlayTime = p.MedicPlayTime;
+        newProgress.EngineerPlayTime = p.EngineerPlayTime;
+        newProgress.SupportPlayTime = p.SupportPlayTime;
+        newProgress.ReconPlayTime = p.ReconPlayTime;
+        newProgress.LeaderScore = p.LeaderScore;
+        newProgress.AssaultScore = p.AssaultScore;
+        newProgress.MedicScore = p.MedicScore;
+        newProgress.EngineerScore = p.EngineerScore;
+        newProgress.SupportScore = p.SupportScore;
+        newProgress.ReconScore = p.ReconScore;
+        newProgress.TotalScore = p.TotalScore;
+        return newProgress;
+    }
+
     public static PlayerStats.PlayerProgess ProgressFrom(PlayerProgress dbProgress)
     {
         return new PlayerStats.PlayerProgess

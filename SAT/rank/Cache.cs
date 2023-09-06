@@ -9,6 +9,17 @@ namespace SAT.rank;
 public class Cache
 {
     private static readonly ThreadSafe<Dictionary<ulong, PlayerStats.PlayerProgess>> _cache = new(new Dictionary<ulong, PlayerStats.PlayerProgess>());
+    private static DateTime _lastMapChange = DateTime.Now;
+
+    public static void FlagMapChange()
+    {
+        _lastMapChange = DateTime.Now;
+    }
+
+    public static bool IsStale()
+    {
+        return DateTime.Now - _lastMapChange > TimeSpan.FromMinutes(3);
+    }
 
     public static void Set(ulong steamId, PlayerStats.PlayerProgess stats)
     {
