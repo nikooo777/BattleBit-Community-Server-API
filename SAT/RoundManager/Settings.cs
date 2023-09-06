@@ -13,6 +13,7 @@ public static class Settings
                 p.Modifications.IsExposedOnMap = true;
             }
 
+            server.HalveSpawnTime = true;
             server.TextWallHack = true;
         } else
         {
@@ -20,6 +21,11 @@ public static class Settings
             foreach (var p in server.AllPlayers)
             {
                 p.Modifications.IsExposedOnMap = false;
+            }
+
+            if (server.CurrentPlayerCount >= 8)
+            {
+                server.HalveSpawnTime = false;
             }
 
             if (server.CurrentPlayerCount <= 32)

@@ -40,6 +40,12 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public bool CanSpawnOnPlayers { get; set; }
     public bool TextWallHack { get; set; }
+    public bool HalveSpawnTime { get; set; }
+
+    public float RespawnTime()
+    {
+        return HalveSpawnTime ? 2.5f : 5f;
+    }
 
     public override async Task OnConnected()
     {
@@ -317,6 +323,7 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override async Task<OnPlayerSpawnArguments?> OnPlayerSpawning(MyPlayer player, OnPlayerSpawnArguments request)
     {
+        player.Modifications.RespawnTime = RespawnTime();
         if (Restrictions.IsWeaponRestricted(request.Loadout.PrimaryWeapon.Tool))
         {
             player.WarnPlayer($"You are not allowed to use {request.Loadout.PrimaryWeapon.Tool.Name}!");
@@ -392,7 +399,7 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override async Task OnPlayerDied(MyPlayer player)
     {
-        player.Modifications.RespawnTime = 5f;
+        player.Modifications.RespawnTime = RespawnTime();
         player.Modifications.SpawningRule = CanSpawnOnPlayers ? SpawningRule.All : SpawningRule.None;
     }
 
@@ -422,7 +429,7 @@ public class MyGameServer : GameServer<MyPlayer>
                 if (p.IsDead || !p.IsAlive || p.HideWallHack) continue;
                 foreach (var p2 in AllPlayers)
                 {
-                    if (p.SteamID == p2.SteamID) continue;
+                    if (p.SteamID == p2.SteamID || p.Team == p2.Team) continue;
                     if (p.IsDead || !p2.IsAlive)
                     {
                         sb.AppendLine($"{p2.Name}: dead");
