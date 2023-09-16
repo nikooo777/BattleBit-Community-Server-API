@@ -6,7 +6,7 @@ public static class Settings
 {
     public static void SettingsBalancer(MyGameServer server)
     {
-        if (server.CurrentPlayerCount <= 4)
+        if (server.CurrentPlayerCount <= 6)
         {
             foreach (var p in server.AllPlayers)
             {

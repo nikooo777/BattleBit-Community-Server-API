@@ -151,7 +151,7 @@ public static class ChatProcessor
     private static bool RtvCmd(Arguments args, MyPlayer sender, GameServer<MyPlayer> server)
     {
         var now = DateTime.UtcNow;
-        if (now.Subtract(RtvStartTime).TotalMinutes > 5)
+        if (now.Subtract(RtvStartTime).TotalMinutes > 15)
         {
             RtvStartTime = DateTime.UtcNow;
             RtvVotes = 0;
@@ -159,11 +159,11 @@ public static class ChatProcessor
         }
 
         var totalPlayers = server.AllPlayers.Count();
-        var requiredVotes = (int)Math.Ceiling(totalPlayers * 0.6);
+        var requiredVotes = (int)Math.Ceiling(totalPlayers * 0.55);
         if (VotedRtv.TryGetValue(sender.SteamID, out var lastVote))
             if (now.Subtract(lastVote).TotalMinutes < 5)
             {
-                sender.Message($"You have already voted to rock the vote in the last 5 minutes!\nCurrent votes: {RtvVotes} of {requiredVotes} required");
+                sender.Message($"You have already voted to rock the vote in the last 15 minutes!\nCurrent votes: {RtvVotes} of {requiredVotes} required");
                 return false;
             }
 

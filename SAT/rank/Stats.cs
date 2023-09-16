@@ -8,7 +8,7 @@ using SwissAdminTools;
 
 namespace SAT.rank;
 
-public class Stats
+public static class Stats
 {
     public static string TopN(int limit)
     {
@@ -38,7 +38,7 @@ public class Stats
     {
         var db = MyGameServer.Db;
         var playerId = db.Players.FirstOrDefault(p => p.SteamId == (long)steamId)?.Id;
-        var playerProgress = db.PlayerProgresses.FirstOrDefault(progress => progress.PlayerId == playerId);
+        var playerProgress = db.PlayerProgresses.FirstOrDefault(progress => progress.PlayerId == playerId && progress.IsOfficial.CompareTo(0) == 0);
         DbContextPool.ReturnContext(db);
         return playerProgress;
     }
