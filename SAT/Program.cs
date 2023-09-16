@@ -11,6 +11,7 @@ using SAT.rank;
 using SAT.RoundManager;
 using SAT.Statistics;
 using SAT.SwissAdminTools;
+using SAT.TeamBalancer;
 using SAT.Utils;
 using Admin = SAT.SwissAdminTools.Admin;
 using Restrictions = SAT.SwissAdminTools.Restrictions;
@@ -275,6 +276,7 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override async Task OnPlayerConnected(MyPlayer player)
     {
+        player.ConnectTime = DateTime.Now;
         Settings.SettingsBalancer(this);
         var db = Db;
         try
@@ -374,6 +376,7 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override async Task OnAPlayerDownedAnotherPlayer(OnPlayerKillArguments<MyPlayer> args)
     {
+        Balancer.TeamBalancerCheck(this);
         Console.WriteLine($"Player {args.Killer.Name} killed {args.Victim.Name} with {args.KillerTool} from a distance of {Vector3.Distance(args.KillerPosition, args.VictimPosition)}m");
         var isSuicide = args.Killer.SteamID == args.Victim.SteamID;
         if (isSuicide)
@@ -399,6 +402,9 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override async Task OnPlayerDied(MyPlayer player)
     {
+        player.IsFlaggedForTeamSwitch = true;
+        Balancer.BalancePlayer(player, this);
+        Settings.SettingsBalancer(this);
         player.Modifications.RespawnTime = RespawnTime();
         player.Modifications.SpawningRule = CanSpawnOnPlayers ? SpawningRule.All : SpawningRule.None;
     }
@@ -421,8 +427,8 @@ public class MyGameServer : GameServer<MyPlayer>
             {
                 var sb = new StringBuilder();
                 //get the distance between all players
-                //adding cache could reduce the amount of computations by half but since we do this for 4 players max it's not really worth it
-                sb.AppendLine($"Text/Map WallHack {RichText.Green}enabled{RichText.EndColor} with less than 5 players");
+                //adding cache could reduce the amount of computations by half but since we do this for 7 players max it's not really worth it
+                sb.AppendLine($"Text/Map WallHack {RichText.Green}enabled{RichText.EndColor} with less than 7 players");
                 sb.AppendLine($"type {RichText.Red}wall{RichText.EndColor} to toggle it on/off");
                 sb.AppendLine("Generally once 2-3 players connect, more players will follow");
                 sb.AppendLine("Distance to other players:");
@@ -433,6 +439,7 @@ public class MyGameServer : GameServer<MyPlayer>
                     if (p.IsDead || !p2.IsAlive)
                     {
                         sb.AppendLine($"{p2.Name}: dead");
+                        continue;
                     }
 
                     var distance = Vector3.Distance(p.Position, p2.Position);
@@ -452,7 +459,9 @@ public class MyGameServer : GameServer<MyPlayer>
 
 public class MyPlayer : Player<MyPlayer>
 {
+    public DateTime ConnectTime;
     public bool HideWallHack = false;
+    public bool IsFlaggedForTeamSwitch;
     private int mDbId = -1;
     private (bool initialized, bool isAdmin) mIsAdmin = (false, false);
 
