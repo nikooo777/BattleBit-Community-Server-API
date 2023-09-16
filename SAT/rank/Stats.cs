@@ -8,7 +8,7 @@ using SwissAdminTools;
 
 namespace SAT.rank;
 
-public class Stats
+public static class Stats
 {
     public static string TopN(int limit)
     {

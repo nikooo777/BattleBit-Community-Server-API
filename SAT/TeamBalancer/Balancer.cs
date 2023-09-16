@@ -71,28 +71,14 @@ public static class Balancer
 
         var difference = Math.Abs(teamACount - teamBCount);
         var disadvantagedTeam = teamACount > teamBCount ? Team.TeamB : Team.TeamA;
-        var maxDifference = 1;
-        switch (server.CurrentPlayerCount)
+        var maxDifference = server.CurrentPlayerCount switch
         {
-            case <= 6:
-                maxDifference = 1;
-                break;
-            case <= 12:
-                maxDifference = 2;
-                break;
-            case <= 24:
-                maxDifference = 3;
-                break;
-            case <= 32:
-                maxDifference = 4;
-                break;
-            case <= 48:
-                maxDifference = 5;
-                break;
-            default:
-                maxDifference = 6;
-                break;
-        }
+            <= 20 => 1,
+            <= 28 => 2,
+            <= 35 => 3,
+            <= 48 => 4,
+            _ => 5
+        };
 
         if (difference <= maxDifference) return;
 
@@ -142,6 +128,6 @@ public static class Balancer
         }
 
         p.JoinSquad(bestSquad.Name);
-        p.Message("You have been moved to the other team to balance the game", 2f);
+        p.Message("You have been moved to the other team to balance the game", 3f);
     }
 }

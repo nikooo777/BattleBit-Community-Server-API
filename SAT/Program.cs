@@ -402,7 +402,6 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override async Task OnPlayerDied(MyPlayer player)
     {
-        player.IsFlaggedForTeamSwitch = true;
         Balancer.BalancePlayer(player, this);
         Settings.SettingsBalancer(this);
         player.Modifications.RespawnTime = RespawnTime();
