@@ -37,6 +37,7 @@ public class Advertisements
 
     private void Terminate()
     {
+        Console.WriteLine("Terminating advertisements thread...");
         mShouldTerminate = true;
     }
 

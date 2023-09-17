@@ -26,9 +26,9 @@ internal class Program
         const int port = 1337;
         DbContextPool.Initialize(16);
         var listener = new ServerListener<MyPlayer, MyGameServer>();
-        listener.OnGameServerConnected += async server => { Console.WriteLine($"Gameserver connected! {server.GameIP}:{server.GamePort} {server.ServerName}"); };
+        listener.OnGameServerConnected += async server => { Console.WriteLine($"[{DateTime.UtcNow}] Gameserver connected! {server.GameIP}:{server.GamePort} {server.ServerName}"); };
         listener.Start(port);
-        Console.WriteLine($"APIs Server started on port {port}");
+        Console.WriteLine($"[{DateTime.UtcNow}] APIs Server started on port {port}");
         Thread.Sleep(-1);
     }
 }
@@ -68,22 +68,22 @@ public class MyGameServer : GameServer<MyPlayer>
         Formatting.SafeSetLoadingScreenText(ConfigurationManager.Config.join_text + "\n" + Stats.TopN(3), this);
         foreach (var rt in ConfigurationManager.Config.restrictions.weapon_types)
         {
-            Console.WriteLine("Adding restriction for " + rt + "");
+            Console.WriteLine($"[{DateTime.UtcNow}] Adding restriction for " + rt + "");
             var exists = Enum.TryParse(rt, true, out WeaponType wepType);
             if (exists)
                 Restrictions.AddCategoryRestriction(wepType);
             else
-                Console.WriteLine("Could not find weapon type " + rt + "");
+                Console.WriteLine($"[{DateTime.UtcNow}] Could not find weapon type " + rt + "");
         }
 
         foreach (var rt in ConfigurationManager.Config.restrictions.weapons)
         {
-            Console.WriteLine("Adding restriction for " + rt + "");
+            Console.WriteLine($"[{DateTime.UtcNow}] Adding restriction for " + rt + "");
             var exists = Weapons.TryFind(rt, out var wep);
             if (exists)
                 Restrictions.AddWeaponRestriction(wep);
             else
-                Console.WriteLine("Could not find weapon " + rt + "");
+                Console.WriteLine($"[{DateTime.UtcNow}] Could not find weapon " + rt + "");
         }
 
         ServerSettings.CanVoteNight = false;
@@ -313,6 +313,7 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override Task<bool> OnPlayerTypedMessage(MyPlayer player, ChatChannel channel, string msg)
     {
+        Console.WriteLine($"[{DateTime.UtcNow}] Player {player.Name} - {player.SteamID} typed: {msg}");
         ChatLogger.StoreChatLog(player, msg);
         var res = ChatProcessor.ProcessChat(msg, player, this);
         if (!res) return Task.FromResult(false);
@@ -377,7 +378,7 @@ public class MyGameServer : GameServer<MyPlayer>
     public override async Task OnAPlayerDownedAnotherPlayer(OnPlayerKillArguments<MyPlayer> args)
     {
         Balancer.TeamBalancerCheck(this);
-        Console.WriteLine($"Player {args.Killer.Name} killed {args.Victim.Name} with {args.KillerTool} from a distance of {Vector3.Distance(args.KillerPosition, args.VictimPosition)}m");
+        Console.WriteLine($"[{DateTime.UtcNow}] Player {args.Killer.Name} killed {args.Victim.Name} with {args.KillerTool} from a distance of {Vector3.Distance(args.KillerPosition, args.VictimPosition)}m");
         var isSuicide = args.Killer.SteamID == args.Victim.SteamID;
         if (isSuicide)
         {
@@ -402,7 +403,14 @@ public class MyGameServer : GameServer<MyPlayer>
 
     public override async Task OnPlayerDied(MyPlayer player)
     {
-        Balancer.BalancePlayer(player, this);
+        if (CurrentPlayerCount < 30)
+        {
+            Balancer.FastBalance(player, this);
+        } else
+        {
+            Balancer.BalancePlayer(player, this);
+        }
+
         Settings.SettingsBalancer(this);
         player.Modifications.RespawnTime = RespawnTime();
         player.Modifications.SpawningRule = CanSpawnOnPlayers ? SpawningRule.All : SpawningRule.None;
