@@ -7,6 +7,27 @@ public class Restrictions
 {
     private static readonly ThreadSafe<Dictionary<Weapon, bool>> BlockedWeapons = new(new Dictionary<Weapon, bool>());
     private static readonly ThreadSafe<Dictionary<WeaponType, bool>> BlockedCategories = new(new Dictionary<WeaponType, bool>());
+    private static readonly ThreadSafe<Dictionary<Gadget, bool>> BlockedGadgets = new(new Dictionary<Gadget, bool>());
+
+    public static bool IsGadgetRestricted(Gadget gadget)
+    {
+        using (BlockedGadgets.GetReadHandle())
+        {
+            var blocked = BlockedGadgets.Value.ContainsKey(gadget);
+            if (blocked)
+                return true;
+        }
+
+        return false;
+    }
+
+    public static void AddGadgetRestriction(Gadget gadget)
+    {
+        using (BlockedGadgets.GetWriteHandle())
+        {
+            BlockedGadgets.Value.Add(gadget, true);
+        }
+    }
 
     public static bool IsWeaponRestricted(Weapon weapon)
     {

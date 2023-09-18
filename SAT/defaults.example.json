@@ -5,6 +5,13 @@
     "weapon_types": [
       "SniperRifle"
     ],
+    "gadgets": [
+      "Rpg7 Fragmentation",
+      "Rpg7 Heat Explosive",
+      "Rpg7 Pgo7 Fragmentation",
+      "Rpg7 Pgo7 Heat Explosive",
+      "Rpg7 Pgo7 Tandem"
+    ],
     "classes": [
     ]
   },

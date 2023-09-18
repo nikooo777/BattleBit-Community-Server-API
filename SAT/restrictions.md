@@ -119,3 +119,47 @@ HeavyPistol
 Carbine
 PersonalDefenseWeapon_PDW
 ```
+
+## Gadget Restrictions
+
+```
+Advanced Binoculars
+Air Drone
+Anti Personnel Mine
+Anti Vehicle Grenade
+Anti Vehicle Mine
+Bandage
+Bino Soflam
+Binoculars
+C4
+Claymore
+Flare
+Flashbang
+Frag Grenade
+Grappling Hook
+Heavy Ammo Kit
+Impact Grenade
+M320 Smoke Grenade Launcher
+Mdx 201
+Medic Kit
+Pickaxe
+Pickaxe IronPickaxe
+Range Finder
+Repair Tool
+Riot Shield
+Rpg7 Fragmentation
+Rpg7 Heat Explosive
+Rpg7 Pgo7 Fragmentation
+Rpg7 Pgo7 Heat Explosive
+Rpg7 Pgo7 Tandem
+Sledge Hammer
+Sledge Hammer SkinA
+Sledge Hammer SkinB
+Sledge Hammer SkinC
+Small Ammo Kit
+Smoke Grenade Blue
+Smoke Grenade Green
+Smoke Grenade Red
+Smoke Grenade White
+SuicideC4
+```

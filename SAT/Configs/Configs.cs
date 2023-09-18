@@ -18,6 +18,7 @@ public class Configuration
 public class Restrictions
 {
     public List<string> weapons { get; set; }
+    public List<string> gadgets { get; set; }
     public List<string> weapon_types { get; set; }
     public List<string> classes { get; set; }
 }
@@ -57,8 +58,7 @@ public static class ConfigurationManager
         {
             var jsonText = File.ReadAllText(path);
             Config = JsonConvert.DeserializeObject<Configuration>(jsonText);
-        }
-        else
+        } else
         {
             throw new FileNotFoundException($"Configuration file not found at {path}");
         }

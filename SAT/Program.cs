@@ -86,6 +86,16 @@ public class MyGameServer : GameServer<MyPlayer>
                 Console.WriteLine($"[{DateTime.UtcNow}] Could not find weapon " + rt + "");
         }
 
+        foreach (var g in ConfigurationManager.Config.restrictions.gadgets)
+        {
+            Console.WriteLine($"[{DateTime.UtcNow}] Adding restriction for " + g + "");
+            var exists = Gadgets.TryFind(g, out var gad);
+            if (exists)
+                Restrictions.AddGadgetRestriction(gad);
+            else
+                Console.WriteLine($"[{DateTime.UtcNow}] Could not find gadget " + g + "");
+        }
+
         ServerSettings.CanVoteNight = false;
 
         MapRotation.SetRotation(ConfigurationManager.Config.rotations.maps.ToArray());
@@ -337,6 +347,16 @@ public class MyGameServer : GameServer<MyPlayer>
         {
             player.WarnPlayer($"You are not allowed to use {request.Loadout.SecondaryWeapon.Tool.Name}!");
             return null;
+        }
+
+        if (Restrictions.IsGadgetRestricted(request.Loadout.HeavyGadget))
+        {
+            player.SetHeavyGadget("", 0, true);
+        }
+
+        if (Restrictions.IsGadgetRestricted(request.Loadout.LightGadget))
+        {
+            player.SetLightGadget("", 0, true);
         }
 
         return request;
