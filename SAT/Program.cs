@@ -351,12 +351,14 @@ public class MyGameServer : GameServer<MyPlayer>
 
         if (Restrictions.IsGadgetRestricted(request.Loadout.HeavyGadget))
         {
-            player.SetHeavyGadget("", 0, true);
+            request.Loadout.HeavyGadget = null;
+            // player.SetHeavyGadget("", 0, true);
         }
 
         if (Restrictions.IsGadgetRestricted(request.Loadout.LightGadget))
         {
-            player.SetLightGadget("", 0, true);
+            request.Loadout.LightGadget = null;
+            // player.SetLightGadget("", 0, true);
         }
 
         return request;
