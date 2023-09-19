@@ -118,7 +118,6 @@ public class MyGameServer : GameServer<MyPlayer>
         {
             case GameState.WaitingForPlayers:
                 RoundSettings.PlayersToStart = 0;
-                RoundSettings.SecondsLeft = 5;
                 ForceStartGame();
                 break;
             case GameState.Playing:
