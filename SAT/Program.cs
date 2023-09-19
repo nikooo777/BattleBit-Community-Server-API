@@ -118,6 +118,7 @@ public class MyGameServer : GameServer<MyPlayer>
         {
             case GameState.WaitingForPlayers:
                 RoundSettings.PlayersToStart = 0;
+                RoundSettings.SecondsLeft = 5;
                 ForceStartGame();
                 break;
             case GameState.Playing:
@@ -490,7 +491,7 @@ public class MyGameServer : GameServer<MyPlayer>
         }
 
         //todo: remove after update
-        if (RoundSettings.SecondsLeft < 30 && CurrentPlayerCount == 0)
+        if (RoundSettings.SecondsLeft < 30 && CurrentPlayerCount == 0 && RoundSettings.State == GameState.Playing)
         {
             RoundSettings.SecondsLeft = 3600; //this helps with the crashes when the server is empty
         }
