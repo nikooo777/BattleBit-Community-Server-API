@@ -63,37 +63,46 @@ public class MyGameServer : GameServer<MyPlayer>
             ForceStartGame();
         }
 
+        ExecuteCommand("setspeedhackdetection false"); //temp fix for false positives
         GamemodeRotation.SetRotation(ConfigurationManager.Config.rotations.gamemodes.ToArray());
         SetRulesScreenText("This is a test");
         Formatting.SafeSetLoadingScreenText(ConfigurationManager.Config.join_text + "\n" + Stats.TopN(3), this);
-        foreach (var rt in ConfigurationManager.Config.restrictions.weapon_types)
+        try
         {
-            Console.WriteLine($"[{DateTime.UtcNow}] Adding restriction for " + rt + "");
-            var exists = Enum.TryParse(rt, true, out WeaponType wepType);
-            if (exists)
-                Restrictions.AddCategoryRestriction(wepType);
-            else
-                Console.WriteLine($"[{DateTime.UtcNow}] Could not find weapon type " + rt + "");
-        }
+            foreach (var rt in ConfigurationManager.Config.restrictions.weapon_types)
+            {
+                Console.WriteLine($"[{DateTime.UtcNow}] Adding restriction for " + rt + "");
+                var exists = Enum.TryParse(rt, true, out WeaponType wepType);
+                if (exists)
+                    Restrictions.AddCategoryRestriction(wepType);
+                else
+                    Console.WriteLine($"[{DateTime.UtcNow}] Could not find weapon type " + rt + "");
+            }
 
-        foreach (var rt in ConfigurationManager.Config.restrictions.weapons)
-        {
-            Console.WriteLine($"[{DateTime.UtcNow}] Adding restriction for " + rt + "");
-            var exists = Weapons.TryFind(rt, out var wep);
-            if (exists)
-                Restrictions.AddWeaponRestriction(wep);
-            else
-                Console.WriteLine($"[{DateTime.UtcNow}] Could not find weapon " + rt + "");
-        }
+            foreach (var rt in ConfigurationManager.Config.restrictions.weapons)
+            {
+                Console.WriteLine($"[{DateTime.UtcNow}] Adding restriction for " + rt + "");
+                var exists = Weapons.TryFind(rt, out var wep);
+                if (exists)
+                    Restrictions.AddWeaponRestriction(wep);
+                else
+                    Console.WriteLine($"[{DateTime.UtcNow}] Could not find weapon " + rt + "");
+            }
 
-        foreach (var g in ConfigurationManager.Config.restrictions.gadgets)
+            foreach (var g in ConfigurationManager.Config.restrictions.gadgets)
+            {
+                Console.WriteLine($"[{DateTime.UtcNow}] Adding restriction for " + g + "");
+                var exists = Gadgets.TryFind(g, out var gad);
+                if (exists)
+                    Restrictions.AddGadgetRestriction(gad);
+                else
+                    Console.WriteLine($"[{DateTime.UtcNow}] Could not find gadget " + g + "");
+            }
+        }
+        catch (Exception e)
         {
-            Console.WriteLine($"[{DateTime.UtcNow}] Adding restriction for " + g + "");
-            var exists = Gadgets.TryFind(g, out var gad);
-            if (exists)
-                Restrictions.AddGadgetRestriction(gad);
-            else
-                Console.WriteLine($"[{DateTime.UtcNow}] Could not find gadget " + g + "");
+            Console.WriteLine(e);
+            throw;
         }
 
         ServerSettings.CanVoteNight = false;

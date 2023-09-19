@@ -3,7 +3,7 @@ using BattleBitAPI.Common.Threading;
 
 namespace SAT.SwissAdminTools;
 
-public class Restrictions
+public static class Restrictions
 {
     private static readonly ThreadSafe<Dictionary<Weapon, bool>> BlockedWeapons = new(new Dictionary<Weapon, bool>());
     private static readonly ThreadSafe<Dictionary<WeaponType, bool>> BlockedCategories = new(new Dictionary<WeaponType, bool>());
@@ -25,6 +25,8 @@ public class Restrictions
     {
         using (BlockedGadgets.GetWriteHandle())
         {
+            if (BlockedGadgets.Value.ContainsKey(gadget))
+                return;
             BlockedGadgets.Value.Add(gadget, true);
         }
     }
@@ -48,6 +50,8 @@ public class Restrictions
     {
         using (BlockedWeapons.GetWriteHandle())
         {
+            if (BlockedWeapons.Value.ContainsKey(weapon))
+                return;
             BlockedWeapons.Value.Add(weapon, true);
         }
     }
@@ -57,6 +61,8 @@ public class Restrictions
         Console.WriteLine("Adding category restriction for " + weaponType + "");
         using (BlockedCategories.GetWriteHandle())
         {
+            if (BlockedCategories.Value.ContainsKey(weaponType))
+                return;
             BlockedCategories.Value.Add(weaponType, true);
         }
     }
