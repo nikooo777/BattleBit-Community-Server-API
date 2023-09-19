@@ -489,6 +489,12 @@ public class MyGameServer : GameServer<MyPlayer>
             }
         }
 
+        //todo: remove after update
+        if (RoundSettings.SecondsLeft < 30 && CurrentPlayerCount == 0)
+        {
+            RoundSettings.SecondsLeft = 3600; //this helps with the crashes when the server is empty
+        }
+
         //don't refresh every tick (tick callback is skipped while nothing is returned)
         Thread.Sleep(500);
         return Task.CompletedTask;
